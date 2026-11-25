@@ -215,6 +215,21 @@ table.vt th{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.06em;t
 }
 
 
+
+/* Mobil senaryo menüsü (masaüstünde liste her zaman açık) */
+.navtog{display:none}
+@media (max-width:980px){
+  body[data-mode="durumlar"] .nav{order:2;max-height:none;overflow:visible;padding:6px}
+  .monitor{scroll-margin-top:120px}
+  .navtog{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;background:none;border:0;color:var(--fg);font:inherit;font-size:15px;font-weight:600;text-align:left;padding:8px 10px;cursor:pointer}
+  .navtog span{display:grid;gap:2px;min-width:0}
+  .navtog small{font-family:var(--font-mono);font-size:10.5px;font-weight:400;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .navtog i{font-style:normal;color:var(--muted);transition:transform .2s}
+  .nav.open .navtog i{transform:rotate(180deg)}
+  body[data-mode="durumlar"] .nav .navbody{display:none}
+  body[data-mode="durumlar"] .nav.open .navbody{display:block;max-height:60vh;overflow:auto;border-top:1px solid var(--line);margin-top:4px;padding-top:4px}
+}
+
 /* Sına */
 .qitem{align-items:flex-start}
 .qitem span{display:grid;gap:1px}

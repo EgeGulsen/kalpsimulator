@@ -60,8 +60,10 @@ function navAnatomy(){
   if(!any) html+=`<p class="grp-h">Sonuç yok</p>`;
   return html;
 }
+let navOpen=false;
 function navConds(){
-  return CATS.map(([k,nm])=>`<div class="grp-h">${esc(nm)}</div>`+Object.entries(COND).filter(([,c])=>c.cat===k).map(([key,c])=>`<button class="item cond" type="button" data-cond="${key}" aria-current="${key===condKey}">${esc(c.n)}</button>`).join('')).join('');
+  const c=COND[condKey];
+  return `<button class="navtog" type="button" data-navtog aria-expanded="${navOpen}"><span><small>Senaryo seç · ${Object.keys(COND).length} durum</small>${esc(c.n)}</span><i aria-hidden="true">▾</i></button><div class="navbody">`+CATS.map(([k,nm])=>`<div class="grp-h">${esc(nm)}</div>`+Object.entries(COND).filter(([,c])=>c.cat===k).map(([key,c])=>`<button class="item cond" type="button" data-cond="${key}" aria-current="${key===condKey}">${esc(c.n)}</button>`).join('')).join('')+`</div>`;
 }
 function renderNav(){
   const ae=document.activeElement&&document.activeElement.id==='search', pos=ae?$('search').selectionStart:0;
@@ -70,12 +72,13 @@ function renderNav(){
 }
 nav.addEventListener('input',e=>{if(e.target.id==='search'){query=e.target.value; renderNav();}});
 nav.addEventListener('click',e=>{
+  if(e.target.closest('[data-navtog]')){ navOpen=!navOpen; nav.classList.toggle('open',navOpen); renderNav(); return; }
   const qt=e.target.closest('[data-qtype]'); if(qt){ setQType(qt.dataset.qtype); return; }
   if(e.target.closest('[data-qreset]')){ quiz.score={}; quiz.streak=0; saveScore(); renderNav(); render(); return; }
   const b=e.target.closest('[data-id],[data-cond],[data-lesson]'); if(!b) return;
   if(b.dataset.lesson){openCard(); setLesson(b.dataset.lesson); return;}
   if(b.dataset.id){openCard(); select(b.dataset.id);}
-  else {openCard(); setCond(b.dataset.cond);}
+  else {openCard(); setCond(b.dataset.cond); if(narrow()){ navOpen=false; nav.classList.remove('open'); renderNav(); monitor.scrollIntoView({behavior:reduce?'auto':'smooth',block:'start'}); }}
 });
 
 /* ---------- Sağ kart ---------- */
@@ -356,7 +359,7 @@ const monitor=$('monitor');
 function setCond(k){
   const changed=k!==condKey; condKey=k;
   const fx=COND[k].fx||{}, outside=!!(fx.infarct||fx.sac||fx.rvDilate||fx.clot||fx.dead);
-  if(mode==='durumlar'&&xray.checked===outside){xray.checked=!outside;}
+  void outside;
   sim.setCondition(k); heart&&heart.setMode('durumlar',COND[k],k); heart&&heart.setXray(xray.checked);
   if(heart){ if(fx.infarct==='rca') heart.viewFrom('inferior'); else if(lastView) heart.resetView(); lastView=fx.infarct==='rca'; }
   $('lead').textContent=COND[k].lead||'DII'; $('monName').textContent=COND[k].n;
@@ -371,7 +374,7 @@ btnPlay.addEventListener('click',()=>{sim.playing=!sim.playing; btnPlay.textCont
 document.querySelectorAll('[data-speed]').forEach(b=>b.addEventListener('click',()=>{sim.speed=+b.dataset.speed; document.querySelectorAll('[data-speed]').forEach(x=>x.setAttribute('aria-pressed',x===b));}));
 
 function setMode(m){
-  const prev=mode; mode=m; document.body.classList.remove('qtext');
+  const prev=mode; mode=m; document.body.classList.remove('qtext'); document.body.dataset.mode=m;
   ['anatomi','durumlar','ogren','sina'].forEach(k=>{const a=$('tab-'+k); if(k===m)a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current');});
   const live=m==='durumlar', learnM=m==='ogren';
   document.body.classList.toggle('live',live||learnM);
@@ -388,6 +391,7 @@ function setMode(m){
   } else if(live){
     if(selected&&!['ileti','sinir'].includes(S[selected].k)) selected=null;
     if(reduce&&sim.playing){sim.playing=false; btnPlay.textContent='Oynat';}
+    if(prev!=='durumlar') xray.checked=false; // senaryolar kalbin dışıyla açılır
     setCond(condKey);
   } else {
     monitor.classList.remove('show','swap');
