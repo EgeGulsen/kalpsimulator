@@ -1,7 +1,7 @@
 /* Kalp Simülatörü: arayüz, mod geçişi, etiketler ve EKG çizimi. */
 (function(){
 'use strict';
-const {KIND,S,GROUPS,COND,CATS,SOURCES,LESSONS,FAQ}=window.KALP;
+const {KIND,S,GROUPS,COND,CATS,SOURCES,LESSONS,FAQ,MCQ,ECG_POOL}=window.KALP;
 const E12=window.KalpECG12;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -20,13 +20,13 @@ const stage=$('stage'), tip=$('tip'), loading=$('loading'), xray=$('t-xray'), tL
 try{
   heart=window.KalpHeart.create(stage,{
     modelUrl:['assets/heart.glb','assets/heart.b64.txt'],
-    onPick:id=>{ if(id) openCard(); select(id); },
+    onPick:id=>{ if(mode==='sina'&&quizPick(id)) return; if(id) openCard(); select(id); },
     onHover:(id,x,y)=>{
-      if(!id){tip.hidden=true;return;}
+      if(!id||quizHidesNames()){tip.hidden=true;return;}
       const r=stage.getBoundingClientRect();
       tip.textContent=S[id]?S[id].n:id; tip.hidden=false; tip.style.left=(x-r.left)+'px'; tip.style.top=(y-r.top)+'px';
     },
-    onReady:()=>{loading.hidden=true; if(partsOpen){heart.setFocus(focusMode); renderParts();} if(mode==='ogren'){applyLearn3D();} else heart.setMode(mode,mode==='durumlar'?COND[condKey]:null,condKey); heart.setXray(xray.checked); heart.select(selected); insets(); if(mode==='durumlar'&&(COND[condKey].fx||{}).infarct==='rca'){heart.viewFrom('inferior'); lastView=true;}},
+    onReady:()=>{loading.hidden=true; if(partsOpen){heart.setFocus(focusMode); renderParts();} if(mode==='ogren'){applyLearn3D();} else if(mode==='sina'){applyQ3D();} else heart.setMode(mode,mode==='durumlar'?COND[condKey]:null,condKey); heart.setXray(xray.checked); heart.select(selected); insets(); if(mode==='durumlar'&&(COND[condKey].fx||{}).infarct==='rca'){heart.viewFrom('inferior'); lastView=true;}},
     onError:()=>{loading.innerHTML='3D model yüklenemedi. Dosyayı doğrudan açtıysan bir yerel sunucu ile aç<br>(ör. <code>python3 -m http.server</code>).';}
   });
   stage.insertBefore(heart.canvas,stage.firstChild);
@@ -60,20 +60,25 @@ function navAnatomy(){
   if(!any) html+=`<p class="grp-h">Sonuç yok</p>`;
   return html;
 }
+let navOpen=false;
 function navConds(){
-  return CATS.map(([k,nm])=>`<div class="grp-h">${esc(nm)}</div>`+Object.entries(COND).filter(([,c])=>c.cat===k).map(([key,c])=>`<button class="item cond" type="button" data-cond="${key}" aria-current="${key===condKey}">${esc(c.n)}</button>`).join('')).join('');
+  const c=COND[condKey];
+  return `<button class="navtog" type="button" data-navtog aria-expanded="${navOpen}"><span><small>Senaryo seç · ${Object.keys(COND).length} durum</small>${esc(c.n)}</span><i aria-hidden="true">▾</i></button><div class="navbody">`+CATS.map(([k,nm])=>`<div class="grp-h">${esc(nm)}</div>`+Object.entries(COND).filter(([,c])=>c.cat===k).map(([key,c])=>`<button class="item cond" type="button" data-cond="${key}" aria-current="${key===condKey}">${esc(c.n)}</button>`).join('')).join('')+`</div>`;
 }
 function renderNav(){
   const ae=document.activeElement&&document.activeElement.id==='search', pos=ae?$('search').selectionStart:0;
-  nav.innerHTML= mode==='anatomi'?navAnatomy():mode==='ogren'?navLearn():navConds();
+  nav.innerHTML= mode==='anatomi'?navAnatomy():mode==='ogren'?navLearn():mode==='sina'?navQuiz():navConds();
   if(ae){const s=$('search'); s.focus(); s.setSelectionRange(pos,pos);}
 }
 nav.addEventListener('input',e=>{if(e.target.id==='search'){query=e.target.value; renderNav();}});
 nav.addEventListener('click',e=>{
+  if(e.target.closest('[data-navtog]')){ navOpen=!navOpen; nav.classList.toggle('open',navOpen); renderNav(); return; }
+  const qt=e.target.closest('[data-qtype]'); if(qt){ setQType(qt.dataset.qtype); return; }
+  if(e.target.closest('[data-qreset]')){ quiz.score={}; quiz.streak=0; saveScore(); renderNav(); render(); return; }
   const b=e.target.closest('[data-id],[data-cond],[data-lesson]'); if(!b) return;
   if(b.dataset.lesson){openCard(); setLesson(b.dataset.lesson); return;}
   if(b.dataset.id){openCard(); select(b.dataset.id);}
-  else {openCard(); setCond(b.dataset.cond);}
+  else {openCard(); setCond(b.dataset.cond); if(narrow()){ navOpen=false; nav.classList.remove('open'); renderNav(); monitor.scrollIntoView({behavior:reduce?'auto':'smooth',block:'start'}); }}
 });
 
 /* ---------- Sağ kart ---------- */
@@ -143,13 +148,16 @@ function condHTML(){
 }
 let bA=null,bV=null;
 function render(){
-  card.innerHTML = mode==='anatomi'?anatomyHTML():mode==='ogren'?learnHTML():condHTML();
+  card.innerHTML = mode==='anatomi'?anatomyHTML():mode==='ogren'?learnHTML():mode==='sina'?quizHTML():condHTML();
   bA=$('bA'); bV=$('bV');
   card.classList.toggle('hide',!cardOpen);
   queueMicrotask(()=>renderParts());
 }
 card.addEventListener('click',e=>{
   if(e.target.id==='cardX'){cardOpen=false; card.classList.add('hide'); insets(); return;}
+  if(mode==='sina'){ const qa=e.target.closest('[data-qa]'); if(qa){ quizAnswer(+qa.dataset.qa); return; }
+    if(e.target.closest('[data-qnext]')){ newQ(); return; }
+    if(e.target.closest('[data-qgive]')){ quizReveal(); return; } }
   const lk=e.target.closest('[data-lead]'); if(lk){ setLead(lk.dataset.lead); return; }
   const ls=e.target.closest('[data-lesson]'); if(ls){ setLesson(ls.dataset.lesson); card.scrollTop=0; return; }
   const b=e.target.closest('[data-id]'); if(b) select(b.dataset.id);
@@ -268,7 +276,7 @@ const labLayer=$('labels'), pool=new Map();
 labLayer.addEventListener('click',e=>{const d=e.target.closest('[data-lead]'); if(d){setLead(d.dataset.lead); return;} const l=e.target.closest('[data-id]'); if(l){openCard(); select(l.dataset.id);}});
 function drawLabels(){
   if(!heart||!heart.ready){return;}
-  const {list,pin}=heart.labels(), show=tLabels.checked, used=new Set(), boxes=[];
+  const {list,pin}=heart.labels(), show=tLabels.checked&&!quizHidesNames(), used=new Set(), boxes=[];
   const place=(key,id,x,y,cls)=>{
     if(!S[id]) return;
     let el=pool.get(key); if(!el){el=document.createElement('div'); el.className='lab'; labLayer.appendChild(el); pool.set(key,el);}
@@ -351,7 +359,7 @@ const monitor=$('monitor');
 function setCond(k){
   const changed=k!==condKey; condKey=k;
   const fx=COND[k].fx||{}, outside=!!(fx.infarct||fx.sac||fx.rvDilate||fx.clot||fx.dead);
-  if(mode==='durumlar'&&xray.checked===outside){xray.checked=!outside;}
+  void outside;
   sim.setCondition(k); heart&&heart.setMode('durumlar',COND[k],k); heart&&heart.setXray(xray.checked);
   if(heart){ if(fx.infarct==='rca') heart.viewFrom('inferior'); else if(lastView) heart.resetView(); lastView=fx.infarct==='rca'; }
   $('lead').textContent=COND[k].lead||'DII'; $('monName').textContent=COND[k].n;
@@ -366,8 +374,8 @@ btnPlay.addEventListener('click',()=>{sim.playing=!sim.playing; btnPlay.textCont
 document.querySelectorAll('[data-speed]').forEach(b=>b.addEventListener('click',()=>{sim.speed=+b.dataset.speed; document.querySelectorAll('[data-speed]').forEach(x=>x.setAttribute('aria-pressed',x===b));}));
 
 function setMode(m){
-  const prev=mode; mode=m;
-  ['anatomi','durumlar','ogren'].forEach(k=>{const a=$('tab-'+k); if(k===m)a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current');});
+  const prev=mode; mode=m; document.body.classList.remove('qtext'); document.body.dataset.mode=m;
+  ['anatomi','durumlar','ogren','sina'].forEach(k=>{const a=$('tab-'+k); if(k===m)a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current');});
   const live=m==='durumlar', learnM=m==='ogren';
   document.body.classList.toggle('live',live||learnM);
   heart&&heart.setLearn(learnM,E12.LEADS);
@@ -377,9 +385,13 @@ function setMode(m){
     selected=null; if(prev!=='ogren'||!sim.vent.length){ sim.setCondition('nsr'); xray.checked=true; } applyLearn3D();
     requestAnimationFrame(()=>{e12.classList.add('show'); setTimeout(()=>{size12(); insets();},650);});
     setLesson(lesson);
+  } else if(m==='sina'){
+    e12.classList.remove('show'); if(lastView&&heart){heart.resetView(); lastView=false;}
+    selected=null; if(!quiz.cur) newQ(); else { applyQ3D(); render(); renderNav(); }
   } else if(live){
     if(selected&&!['ileti','sinir'].includes(S[selected].k)) selected=null;
     if(reduce&&sim.playing){sim.playing=false; btnPlay.textContent='Oynat';}
+    if(prev!=='durumlar') xray.checked=false; // senaryolar kalbin dışıyla açılır
     setCond(condKey);
   } else {
     monitor.classList.remove('show','swap');
@@ -392,10 +404,123 @@ function setMode(m){
 function fromHash(){
   const h=location.hash.replace('#','').split('/');
   if(h[0]==='durumlar'){ if(h[1]&&COND[h[1]]) condKey=h[1]; setMode('durumlar'); }
+  else if(h[0]==='sina'){ if(h[1]&&['karisik','ecg','bul','bilgi'].includes(h[1])&&h[1]!==quiz.type){quiz.type=h[1]; quiz.cur=null;} setMode('sina'); }
   else if(h[0]==='ogren'){ if(h[1]&&(h[1]==='sss'||LESSONS.some(l=>l.id===h[1]))) lesson=h[1]; setMode('ogren'); }
   else setMode('anatomi');
 }
 window.addEventListener('hashchange',fromHash);
+
+
+/* ---------- Sına: EKG'den tanı, kalpte bul ve tıkla, EKG bilgisi ---------- */
+const QT={karisik:'Karışık',ecg:'EKG’den tanı koy',bul:'Kalpte bul ve tıkla',bilgi:'EKG bilgisi'};
+const QDESC={karisik:'Üç türden rastgele sorular',ecg:'Kayan EKG’ye bakıp durumu seç',bul:'Adı verilen yapıyı 3D kalpte tıkla',bilgi:MCQ.length+' çoktan seçmeli soru'};
+const quiz={type:'karisik',cur:null,score:{},streak:0,best:0,recent:[]};
+try{ const sv=JSON.parse(localStorage.getItem('kalp.sina')||'null'); if(sv){quiz.score=sv.score||{}; quiz.best=sv.best||0;} }catch(e){}
+function saveScore(){ try{ localStorage.setItem('kalp.sina',JSON.stringify({score:quiz.score,best:quiz.best})); }catch(e){} }
+const shuffle=a=>{a=a.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a;};
+const INNER={ias:1,ivs:1,pap:1,mod:1};
+function needsXray(id){ let k=id; while(k){ if(INNER[k]) return true; k=S[k]&&S[k].p; } const kd=S[id]&&S[id].k; return kd==='ileti'||kd==='sinir'||kd==='kapak'; }
+function fresh(list,key){ const f=list.filter(x=>!quiz.recent.includes(key+':'+x)); return f.length?f:list; }
+function newQ(){
+  let t=quiz.type;
+  if(t==='karisik') t=shuffle(heart&&heart.ready?['ecg','bul','bilgi']:['ecg','bilgi'])[0];
+  if(t==='bul'&&!(heart&&heart.ready)) t='bilgi';
+  let q;
+  if(t==='ecg'){
+    const key=shuffle(fresh(ECG_POOL,'ecg'))[0], cat=COND[key].cat;
+    const same=shuffle(ECG_POOL.filter(k=>k!==key&&COND[k].cat===cat)), other=shuffle(ECG_POOL.filter(k=>k!==key&&COND[k].cat!==cat));
+    const opts=shuffle([key,...same.slice(0,2),...other].slice(0,4));
+    q={t,key,opts,ans:opts.indexOf(key),id:'ecg:'+key};
+  } else if(t==='bul'){
+    const ids=heart.pickIds().filter(id=>S[id]);
+    const target=shuffle(fresh(ids,'bul'))[0];
+    q={t,target,tries:0,clicks:[],id:'bul:'+target};
+  } else {
+    const i=shuffle(fresh(MCQ.map((_,i)=>i),'bilgi'))[0], m=MCQ[i];
+    const opts=shuffle([m.a,...m.w]); q={t,i,opts,ans:opts.indexOf(m.a),id:'bilgi:'+i};
+  }
+  quiz.recent.push(q.id); if(quiz.recent.length>8) quiz.recent.shift();
+  quiz.cur=q; selected=null; heart&&heart.select(null); if(quiz.moved&&heart){ heart.resetView(); quiz.moved=false; }
+  applyQ3D(); render(); renderNav(); card.scrollTop=0;
+}
+function applyQ3D(){
+  const q=quiz.cur; if(!q) return;
+  document.body.classList.toggle('qtext',q.t==='bilgi');
+  if(q.t==='ecg'){
+    sim.setCondition(q.key); $('monName').textContent=q.done?COND[q.key].n:'Bu ritim ne?'; $('lead').textContent=COND[q.key].lead||'DII'; $('hrv').textContent='--';
+    if(!monitor.classList.contains('show')) requestAnimationFrame(()=>{monitor.classList.add('show'); setTimeout(()=>{sizeCanvas(); insets();},650);});
+    else { monitor.classList.remove('swap'); void monitor.offsetWidth; monitor.classList.add('swap'); }
+  } else monitor.classList.remove('show','swap');
+  if(!heart||!heart.ready){ insets(); return; }
+  if(q.t==='ecg'&&q.done){ const fx=COND[q.key].fx||{}; heart.setMode('durumlar',COND[q.key],q.key); heart.setXray(!(fx.infarct||fx.sac||fx.rvDilate||fx.clot||fx.dead)); }
+  else { heart.setMode('anatomi'); heart.setXray(q.t==='bul'?needsXray(q.target):xray.checked); if(q.t==='bul') xray.checked=needsXray(q.target); }
+  heart.select(q.t==='bul'&&q.done?q.target:null); if(q.t==='bul'&&q.done&&!q.ok){ heart.reveal(q.target); quiz.moved=true; } insets();
+}
+function quizHidesNames(){ return mode==='sina'&&quiz.cur&&quiz.cur.t==='bul'&&!quiz.cur.done; }
+function addScore(t,ok){ const s=quiz.score[t]||(quiz.score[t]=[0,0]); s[1]++; if(ok){s[0]++; quiz.streak++; quiz.best=Math.max(quiz.best,quiz.streak);} else quiz.streak=0; saveScore(); }
+function quizAnswer(k){
+  const q=quiz.cur; if(!q||q.done||q.t==='bul') return;
+  q.done=true; q.picked=k; q.ok=k===q.ans; addScore(q.t,q.ok);
+  if(q.t==='ecg'){ $('monName').textContent=COND[q.key].n; applyQ3D(); }
+  render(); renderNav();
+}
+function isPart(id,target){ while(id){ if(id===target) return true; id=S[id]&&S[id].p; } return false; }
+function quizPick(id){
+  const q=quiz.cur; if(!q||q.t!=='bul'||q.done) return false;
+  if(!id) return true;
+  if(isPart(id,q.target)){ q.done=true; q.ok=true; addScore('bul',true); }
+  else { q.tries++; q.clicks.push(id); if(q.tries>=3){ q.done=true; q.ok=false; addScore('bul',false); } }
+  if(q.done) applyQ3D();
+  openCard(); render(); renderNav(); return true;
+}
+function quizReveal(){ const q=quiz.cur; if(!q||q.done||q.t!=='bul') return; q.done=true; q.ok=false; addScore('bul',false); applyQ3D(); render(); renderNav(); }
+function setQType(t){ quiz.type=t; if(history.replaceState) history.replaceState(null,'','#sina/'+t); newQ(); openCard(); if(narrow()) card.scrollIntoView({behavior:reduce?'auto':'smooth',block:'nearest'}); }
+function scoreTxt(t){ const s=quiz.score[t]; return s&&s[1]?`${s[0]}/${s[1]}`:''; }
+function navQuiz(){
+  const tot=Object.values(quiz.score).reduce((a,s)=>[a[0]+s[0],a[1]+s[1]],[0,0]);
+  return `<div class="grp-h">Soru türü</div>`+Object.keys(QT).map(k=>`<button class="item qitem" type="button" data-qtype="${k}" aria-current="${k===quiz.type}"><span>${esc(QT[k])}<em>${esc(QDESC[k])}</em></span>${k!=='karisik'&&scoreTxt(k)?`<small>${scoreTxt(k)}</small>`:''}</button>`).join('')+
+    `<div class="grp-h">Skor</div><div class="qstats"><div><b>${tot[1]?Math.round(100*tot[0]/tot[1]):0}%</b><span>doğru (${tot[0]}/${tot[1]})</span></div><div><b>${quiz.streak}</b><span>seri</span></div><div><b>${quiz.best}</b><span>en iyi seri</span></div></div>
+    ${tot[1]?`<button class="item" type="button" data-qreset style="color:var(--muted)">Skoru sıfırla</button>`:''}`;
+}
+function optsHTML(q,label){
+  return `<div class="qopts">${q.opts.map((o,i)=>{const cls=!q.done?'':i===q.ans?' ok':i===q.picked?' no':' dim';
+    return `<button type="button" class="qopt${cls}" data-qa="${i}" ${q.done?'disabled':''}><kbd>${i+1}</kbd><span>${esc(label(o))}</span></button>`;}).join('')}</div>`;
+}
+function verdict(q){ return `<div class="qres ${q.ok?'ok':'no'}">${q.ok?'Doğru':'Yanlış'}${q.ok&&quiz.streak>1?` · ${quiz.streak} soru üst üste`:''}</div>`; }
+const nextBtn=`<button class="btn qnext" type="button" data-qnext>Sonraki soru <kbd>Enter</kbd></button>`;
+function quizHTML(){
+  const q=quiz.cur; if(!q) return `${closeBtn}<p>Soru hazırlanıyor…</p>`;
+  const head=`${closeBtn}<div><div class="eyebrow">Sına · ${esc(QT[q.t])}</div>`;
+  if(q.t==='ecg'){
+    const c=COND[q.key];
+    let h=`${head}<h2>Bu EKG hangi duruma ait?</h2></div><p>Üstteki kayan şeride bak: hız, düzen, P dalgaları, PR, QRS genişliği ve ST–T. Derivasyon: <b>${esc(c.lead||'DII')}</b>.</p>${optsHTML(q,k=>COND[k].n)}`;
+    if(q.done){
+      const read=c.read?`<dl class="read">${Object.entries(c.read).map(([k,v])=>`<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>`:'';
+      h+=`${verdict(q)}<div><div class="eyebrow" style="margin-bottom:6px">${esc(c.n)}: EKG’de ne görülür?</div>${read}<ul class="key">${c.ecg.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>
+        <p class="qlink"><a href="#durumlar/${q.key}">Bu durumu Durumlar’da ayrıntılı aç →</a></p>${nextBtn}`;
+    }
+    return h;
+  }
+  if(q.t==='bul'){
+    const s=S[q.target], par=s.p&&S[s.p];
+    let h=`${head}<h2>${esc(s.n)}</h2><div class="latin">${esc(s.l||'')}</div></div>
+      <p>Bu yapıyı 3D kalpte bul ve üzerine tıkla. Kalbi sürükleyerek çevirebilirsin.${needsXray(q.target)?' İçeride olduğu için <b>İçini göster</b> açıldı.':''}${par?` İpucu: ${esc(par.n)} içinde bir bölüm.`:''}</p>`;
+    if(q.clicks.length&&!q.done) h+=`<div class="qres no">Tıkladığın: ${esc(S[q.clicks[q.clicks.length-1]]?S[q.clicks[q.clicks.length-1]].n:'?')}. Bu değil, ${3-q.tries} hakkın kaldı.</div>`;
+    if(!q.done) h+=`<button class="btn qgive" type="button" data-qgive>Göster</button>`;
+    else h+=`${verdict(q)}${!q.ok?'<p>Doğru yer kalpte turuncu ile işaretlendi ve kalp o tarafa çevrildi.</p>':''}<p>${esc(s.d)}</p>${s.c?`<dl class="facts"><div><dt>Klinik önemi</dt><dd>${esc(s.c)}</dd></div></dl>`:''}${nextBtn}`;
+    return h;
+  }
+  const m=MCQ[q.i];
+  let h=`${head}<h2 class="qq">${esc(m.q)}</h2></div>${optsHTML(q,o=>o)}`;
+  if(q.done) h+=`${verdict(q)}<p>${esc(m.e)}</p>${m.l?`<p class="qlink"><a href="#ogren/${m.l}">İlgili dersi aç →</a></p>`:''}${nextBtn}`;
+  return h;
+}
+document.addEventListener('keydown',e=>{
+  if(mode!=='sina'||!quiz.cur||e.target.closest('input,textarea,select')||e.metaKey||e.ctrlKey||e.altKey) return;
+  const q=quiz.cur;
+  if(/^[1-4]$/.test(e.key)&&q.t!=='bul'&&!q.done&&+e.key<=q.opts.length){ quizAnswer(+e.key-1); e.preventDefault(); }
+  else if(e.key==='Enter'&&q.done&&!e.target.closest('button,a')){ newQ(); e.preventDefault(); }
+});
 
 /* Hakkında */
 $('srcList').innerHTML=(SOURCES||[]).map(([t,u])=>`<li><a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a></li>`).join('');
@@ -417,7 +542,8 @@ function drawECG(){
   strokeCols(ctx,traceCols(t0,pps,Math.ceil(W)),t=>sim.ecgAt(t),v=>base-v*ppmv,0);
   ctx.stroke(); ctx.shadowBlur=0;
   ctx.fillStyle=ECG; ctx.beginPath(); ctx.arc(W-2,base-sim.ecgAt(sim.t)*ppmv,3,0,7); ctx.fill();
-  const c=COND[condKey], r=c.r, X=t=>(t-t0)*pps;
+  const qz=mode==='sina', c=COND[qz?quiz.cur.key:condKey], r=c.r, X=t=>(t-t0)*pps;
+  if(qz&&!quiz.cur.done) return; // soruda ipucu yazıları gizli
   ctx.font='11px "IBM Plex Mono", monospace'; ctx.fillStyle=MUTED; ctx.textAlign='center';
   const lab=(txt,x,y)=>{if(x>14&&x<W-14) ctx.fillText(txt,x,y);};
   const done=sim.vent.filter(e=>e.t+0.6<sim.t&&e.t>t0+0.1), e=done[done.length-1];
@@ -454,11 +580,15 @@ function loop(ts){
     if(bV) bV.style.background = mix(OFF,RED,m.vf&&COND[condKey].r.vent==='vf'?0.3+0.3*Math.random():m.cv);
     if(ts-hrTick>500){hrTick=ts; const hr=sim.heartRate(), v=COND[condKey].r.vent; $('hrv').textContent= v==='vf'?'—':hr==null?'--':hr;}
   }
+  if(mode==='sina'&&quiz.cur&&quiz.cur.t==='ecg'){
+    sim.step(dt); if(cv.width<10) sizeCanvas(); drawECG();
+    if(ts-hrTick>500){hrTick=ts; const hr=sim.heartRate(), v=COND[quiz.cur.key].r.vent; $('hrv').textContent= v==='vf'?'—':hr==null?'--':hr;}
+  }
   if(mode==='ogren'){
     sim.step(dt); if(c12.width<10) size12(); draw12();
     heart&&heart.setVector(vecAt(sim.t));
   }
-  heart&&heart.frame(mode==='durumlar'||mode==='ogren'?sim:null);
+  heart&&heart.frame(mode==='durumlar'||mode==='ogren'||(mode==='sina'&&quiz.cur&&quiz.cur.t==='ecg'&&quiz.cur.done)?sim:null);
   drawLabels();
 }
 window.__kalp={sim,get heart(){return heart;}};
