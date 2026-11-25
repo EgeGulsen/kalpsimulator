@@ -32,6 +32,18 @@ bir yerel sunucu kullanın. Node kurmak istemezseniz Python da yeter: `python3 -
 
 Doğrudan bir bölüme bağlantı verilebilir: `#durumlar/af`, `#durumlar/stemi_ant`, `#ogren/avr`, `#ogren/rprog`, `#ogren/sss` …
 
+## Sına (kendini sınama)
+
+`#sina` bölümünde üç soru türü var; **Karışık** üçünden rastgele seçer:
+
+- **EKG’den tanı koy:** kayan EKG şeridinden durumu seç (25 senaryo). Cevaptan sonra EKG bulguları ve 3D kalp gösterilir.
+- **Kalpte bul ve tıkla:** adı verilen yapıyı (dallar, venler, kapaklar, ileti sistemi…) 3D kalpte tıkla. 3 hak vardır;
+  bilemezsen kalp doğru tarafa çevrilir ve yapı işaretlenir. Soru sırasında isim etiketleri gizlenir.
+- **EKG bilgisi:** açıklamalı çoktan seçmeli sorular (`js/quiz.js` → `MCQ`), her biri ilgili derse bağlanır.
+
+Klavye: 1–4 cevap, Enter sonraki soru. Skor ve en iyi seri tarayıcıda saklanır.
+Doğrudan bağlantı: `#sina/ecg`, `#sina/bul`, `#sina/bilgi`, `#sina/karisik`.
+
 ## Parçaları incele
 
 Alttaki **Parçalar** düğmesi soldaki listeyi parça paneline çevirir. Her parça (odacıklar, septumlar, kapaklar,
@@ -60,10 +72,11 @@ css/style.css           Tüm stiller (koyu tema)
 js/content.js           Anatomi içerikleri: 63 yapı ve alt yapı (S, p = üst yapı), gruplar (GROUPS), kaynaklar (SOURCES)
 js/scenarios.js         Senaryolar (COND) ve kategoriler (CATS): neden, mekanizma, EKG, klinik not
 js/lessons.js           Öğren bölümünün dersleri (LESSONS) ve Sık Sorulan Sorular (FAQ)
+js/quiz.js              Sına bölümünün çoktan seçmeli soruları (MCQ) ve EKG soru havuzu (ECG_POOL)
 js/ecg12.js             12 derivasyon modeli: derivasyon yönleri, kalp vektörü, örnek kayıtlar
 js/sim.js               Ritim zamanlayıcısı, sentetik EKG (DII/DIII/V1/V2), ileti zamanlamaları
 js/heart3d.js           GLB modeli yükler; uyarı dalgası, kasılma, ileti sistemi, duruma özel efektler
-js/app.js               Arayüz, mod geçişi (#anatomi / #durumlar / #ogren), EKG ve 12 derivasyon çizimi
+js/app.js               Arayüz, mod geçişi (#anatomi / #durumlar / #ogren / #sina), EKG ve 12 derivasyon çizimi
 assets/heart.glb        Kalp modeli (19 parça: odacıklar, septumlar, kapaklar, koronerler, büyük damarlar)
 assets/heart.landmarks.json  Modelden çıkarılan referans noktaları (tepe, taban, kapak merkezleri…)
 tools/build_model.py    GLB'yi BodyParts3D STL dosyalarından yeniden üretir

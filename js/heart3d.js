@@ -853,6 +853,12 @@ function create(el,opts){
     setFocus(mode){ state.focus=mode||'none'; applyStatic(); },
     setOthers(v){ state.others=v; applyStatic(); },
     topOf,
+    reveal(id){ // bir yapıyı göster: kamerayı ona çevir ve adını iğnele
+      if(!R) return; const a=R.anchors.find(x=>x.id===id); if(!a) return;
+      if(!a.inner&&!a.cond){ const d=camera.position.distanceTo(controls.target); controls.target.copy(HOME.target); camera.position.copy(HOME.target).addScaledVector(a.out,d); controls.update(); }
+      pin={id,obj:a.obj,local:a.p.clone()};
+    },
+    pickIds(){ if(!R) return []; const set=new Set(Object.keys(R.byId)); for(const k in R.regions) R.regions[k].names.forEach(n=>set.add(n)); set.delete('ap'); return [...set]; },
     labels,
     setLearn(on,leads){ if(on&&R) buildLearn(leads); LG.visible=!!on&&!!learn; if(on&&!R) state.pendingLearn=leads; },
     setLeadSel(id){ learnSel(id); },
