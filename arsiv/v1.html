@@ -1,0 +1,868 @@
+<title>Kalp Simülatörü</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Yerleşim: koyu "kateter laboratuvarı" ekranı. Solda büyük kalp kesiti, sağda inceleme paneli, durum modunda altta EKG monitörü. Tek, bilinçli koyu tema. */
+:root{
+  color-scheme: dark;
+  --bg:#0a1316; --panel:#101c20; --panel-2:#15262b; --line:#21363c; --fg:#e3ece8; --muted:#8aa39f; --faint:#5b7470;
+  --muscle:#8a2c37; --muscle-hi:#ff5c63; --wall-edge:#2a0b10; --af:#ff9a3c; --block:#ff4d4d;
+  --cond:#ffd60a; --cond-dim:#5b4c10; --pulse:#fff6c4;
+  --ecg:#4df0a1; --grid:#123029; --grid-strong:#1d4a3d;
+  --blood-o:#4b161b; --blood-d:#1a2547; --v-red:#a8333d; --v-blue:#33508f; --fibrous:#bfb29b;
+  --font-display:"Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-body:"IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono:"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--font-body);font-size:15px;line-height:1.55}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+.wrap{max-width:1320px;margin:0 auto;padding-left:max(16px, env(safe-area-inset-left,0px));padding-right:max(16px, env(safe-area-inset-right,0px));padding-block:18px 40px;display:grid;gap:16px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px}
+.brand h1{font-family:var(--font-display);font-weight:700;font-size:clamp(26px,3.4vw,38px);line-height:1.05;margin:0;letter-spacing:-.01em;text-wrap:balance}
+.brand h1 .beat{color:var(--muscle-hi)}
+.brand p{margin:4px 0 0;color:var(--muted);font-size:14px;max-width:60ch}
+.tabs{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px}
+.tabs a{font-family:var(--font-display);font-weight:600;font-size:14px;text-decoration:none;color:var(--muted);padding:8px 18px;border-radius:999px}
+.tabs a[aria-current="page"]{background:var(--fg);color:var(--bg)}
+.tabs a:focus-visible,button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--cond);outline-offset:2px}
+
+.main{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:900px){.main{grid-template-columns:minmax(0,1fr)}}
+.stage{background:radial-gradient(120% 90% at 50% 40%, #13252a 0%, var(--panel) 60%);border:1px solid var(--line);border-radius:16px;padding:10px;position:relative;min-width:0}
+.toolbar{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;padding:4px 6px 8px;font-size:13px;color:var(--muted)}
+.toolbar label{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
+.toolbar input{accent-color:var(--cond)}
+#heart{display:block;width:100%;height:auto;max-height:76vh;margin:0 auto;touch-action:manipulation}
+.tip{position:absolute;pointer-events:none;background:#000c;border:1px solid var(--line);color:var(--fg);font-size:12px;padding:4px 8px;border-radius:6px;white-space:nowrap;transform:translate(-50%,-130%)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;padding:8px 6px 2px;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{display:inline-block;width:18px;height:4px;border-radius:2px}
+.sw.dot{width:10px;height:10px;border-radius:50%}
+
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;display:grid;gap:14px;min-width:0}
+.eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.panel h2{font-family:var(--font-display);font-size:24px;line-height:1.15;margin:2px 0 0;text-wrap:balance}
+.latin{font-style:italic;color:var(--muted);font-size:14px}
+.chip{display:inline-block;font-family:var(--font-mono);font-size:11px;letter-spacing:.04em;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--fg);background:var(--panel-2)}
+.chip.k-kas{border-color:#6b2a32;color:#ffb3b7}
+.chip.k-ileti{border-color:#6b5a12;color:var(--cond)}
+.chip.k-sinir{border-color:#6b5a12;color:var(--cond)}
+.chip.k-kapak{border-color:#5d5547;color:#e4d8c2}
+.chip.k-damar{border-color:#2f4673;color:#a9c0f2}
+.panel p{margin:0;max-width:65ch}
+dl.facts{margin:0;display:grid;gap:10px}
+dl.facts dt{font-family:var(--font-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+dl.facts dd{margin:2px 0 0}
+.note{border:1px dashed #6b5a12;background:#1b1a0d;color:#f1e3a1;border-radius:10px;padding:10px 12px;font-size:13.5px}
+.note b{font-family:var(--font-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;display:block;margin-bottom:2px;color:var(--cond)}
+.index{display:grid;gap:10px;border-top:1px solid var(--line);padding-top:12px}
+.index h3{margin:0;font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500}
+.index .row{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.index button,.conds button,.ctrl button{font:inherit;font-size:13px;color:var(--fg);background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:5px 10px;cursor:pointer}
+.index button:hover,.conds button:hover,.ctrl button:hover{border-color:var(--muted)}
+.index button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+
+.conds{display:flex;flex-wrap:wrap;gap:6px;padding:2px 6px 10px}
+.conds button{font-family:var(--font-display);font-weight:600;padding:7px 12px;border-radius:999px}
+.conds button[aria-pressed="true"]{background:var(--cond);color:#1a1500;border-color:var(--cond)}
+.ctrl{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-left:auto}
+.ctrl button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.status{display:flex;flex-wrap:wrap;gap:8px}
+.pill{display:inline-flex;align-items:center;gap:8px;font-size:13px;padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel-2)}
+.pill i{width:10px;height:10px;border-radius:50%;background:#3a2328;display:inline-block;transition:background .05s}
+ul.ecgf{margin:0;padding-left:18px;display:grid;gap:4px}
+.sel-mini{border-top:1px solid var(--line);padding-top:12px;display:grid;gap:6px}
+.sel-mini h4{margin:0;font-family:var(--font-display);font-size:17px}
+.state-on{color:var(--cond)} .state-off{color:#b6a45a} .state-block{color:var(--block)}
+
+.monitor{background:#050b0a;border:1px solid var(--line);border-radius:16px;padding:12px;display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:12px}
+@media (max-width:760px){.monitor{grid-template-columns:minmax(0,1fr)}}
+.monitor .cv{position:relative;min-width:0}
+#ecg{display:block;width:100%;height:210px;border-radius:8px}
+.mlabel{position:absolute;left:10px;top:8px;font-family:var(--font-mono);font-size:12px;color:var(--ecg);opacity:.85}
+.mlabel2{position:absolute;right:10px;top:8px;font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+.read{display:grid;gap:10px;align-content:start;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.hr{color:var(--ecg);font-size:46px;line-height:1;font-weight:500}
+.hr small{font-size:14px;color:var(--muted);margin-left:4px}
+.read dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:12.5px}
+.read dt{color:var(--muted)} .read dd{margin:0;color:var(--fg)}
+footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:12px;display:grid;gap:4px}
+footer strong{color:var(--fg)}
+
+/* SVG */
+#heart text.lab{font-family:var(--font-body);font-size:12px;fill:#e9dfe1;opacity:.75;pointer-events:none;paint-order:stroke;stroke:#00000088;stroke-width:3px}
+#heart text.lab.sm{font-size:10.5px;fill:var(--muted);opacity:1}
+#heart .vessel{stroke:#00000066;stroke-width:1}
+#heart .vessel.red{fill:var(--v-red)} #heart .vessel.blue{fill:var(--v-blue)}
+#heart .wall{fill:var(--muscle);stroke:var(--wall-edge);stroke-width:1.2}
+#heart .cavity{stroke:none} #heart .cavity.deox{fill:var(--blood-d)} #heart .cavity.ox{fill:var(--blood-o)}
+#heart .fossa{fill:#00000030;stroke:#00000040;pointer-events:none}
+#heart .fibrous{fill:var(--fibrous);stroke:#00000055}
+#heart .leaf{stroke:#efe3cf;stroke-width:4;stroke-linecap:round;fill:none}
+#heart .chord{stroke:#efe3cf;stroke-width:.9;opacity:.7;fill:none;pointer-events:none}
+#heart .semilunar{fill:none;stroke:#efe3cf;stroke-width:2.2}
+#heart .cond{fill:none;stroke:var(--cond);stroke-width:3.4;stroke-linecap:round;stroke-linejoin:round}
+#heart .cond.thin{stroke-width:1.8}
+#heart .cond.node{fill:var(--cond);stroke:#2b2400;stroke-width:1}
+#heart .cond.dim{stroke:var(--cond-dim)} #heart .cond.node.dim{fill:var(--cond-dim)}
+#heart .pulse{fill:none;stroke:var(--pulse);stroke-width:5;stroke-linecap:round;pointer-events:none;filter:url(#glow)}
+#heart ellipse.pulse{fill:var(--pulse);stroke:none}
+#heart .nerve{fill:none;stroke:var(--cond);stroke-width:2.2;stroke-dasharray:7 5;stroke-linecap:round}
+#heart .nerve.dim{stroke:var(--cond-dim)}
+#heart .ganglion{fill:var(--cond);stroke:#2b2400}
+#heart .ganglion.dim{fill:var(--cond-dim)}
+#heart .hit{fill:none;stroke:transparent;stroke-width:16;pointer-events:stroke}
+#heart ellipse.hit{fill:transparent;pointer-events:all}
+#heart [data-id]{cursor:pointer}
+#heart .sel-able{transition:opacity .2s}
+#heart.has-sel .sel-able:not(.selected){opacity:.38}
+#heart .wall.selected,#heart .vessel.selected,#heart .fibrous.selected{stroke:#fff;stroke-width:2.6}
+#heart .cond.selected{stroke-width:5.5}
+#heart .cond.node.selected{stroke:#fff;stroke-width:2}
+#heart .nerve.selected{stroke-width:3.6}
+#heart .leaf.selected,#heart .semilunar.selected{stroke:#fff}
+#heart .loop{fill:none;stroke:var(--cond);stroke-width:3;opacity:.9}
+#heart .blockmark path{stroke:var(--block);stroke-width:3.5;stroke-linecap:round;fill:none}
+#heart .afw{fill:none;stroke:var(--cond);stroke-width:2;stroke-linecap:round;filter:url(#glow)}
+#heart.hide-vessels #L-vessels,#heart.hide-valves .valvish,#heart.hide-cond #cond-atrial,#heart.hide-cond #cond-vent,#heart.hide-nerves #nerves,#heart.hide-labels .lab{display:none}
+@media (prefers-reduced-motion: reduce){#heart .sel-able{transition:none}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="eyebrow">Eğitim amaçlı şematik model · v1</div>
+      <h1>Kalp <span class="beat">Simülatörü</span></h1>
+      <p>Kalbin kaslarını, ileti sistemini ve sinirlerini tek tek incele; sonra ritim bozukluklarında kalbin nasıl çalıştığını izle.</p>
+    </div>
+    <nav class="tabs" aria-label="Bölüm">
+      <a href="#anatomi" id="tab-anatomi">Anatomi</a>
+      <a href="#durumlar" id="tab-durumlar">Durumlar</a>
+    </nav>
+  </header>
+
+  <div class="main">
+    <section class="stage" aria-label="Kalp çizimi">
+      <div class="conds" id="condBar" hidden></div>
+      <div class="toolbar">
+        <span id="layerToggles" style="display:contents">
+          <label><input type="checkbox" id="ly-cond" checked> İleti sistemi</label>
+          <label><input type="checkbox" id="ly-nerves" checked> Otonom sinirler</label>
+          <label><input type="checkbox" id="ly-valves" checked> Kapaklar</label>
+          <label><input type="checkbox" id="ly-vessels" checked> Damarlar</label>
+          <label><input type="checkbox" id="ly-labels" checked> Etiketler</label>
+        </span>
+        <div class="ctrl" id="simCtrl" hidden>
+          <button id="btnPlay" type="button">Duraklat</button>
+          <button type="button" data-speed="0.25">0,25×</button>
+          <button type="button" data-speed="0.5">0,5×</button>
+          <button type="button" data-speed="1" aria-pressed="true">1×</button>
+        </div>
+      </div>
+
+      <svg id="heart" viewBox="0 0 600 640" role="group" aria-label="Kalbin şematik dört boşluk kesiti. Yapıları seçmek için tıklayın.">
+        <defs>
+          <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur stdDeviation="2.6" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+
+        <!-- Damarlar -->
+        <g id="L-vessels">
+          <path class="vessel red" data-id="aorta" d="M352 34 L347 6 L363 5 L368 31 Z M383 28 L383 2 L399 2 L399 29 Z M416 34 L425 9 L440 14 L430 40 Z"/>
+          <path class="vessel red" data-id="aorta" d="M300 152 L300 80 C300 36 350 22 398 30 C440 38 470 58 484 84 L456 98 C444 74 424 62 398 60 C362 56 332 66 332 86 L332 152 Z"/>
+          <path class="vessel blue" data-id="pt" d="M344 152 L350 112 C354 96 372 92 390 98 L476 126 L468 146 L392 122 C382 119 378 124 377 132 L376 152 Z"/>
+          <path class="vessel blue" data-id="svc" d="M158 22 L206 22 L212 142 L156 150 Z"/>
+          <path class="vessel blue" data-id="ivc" d="M62 300 L98 296 L118 312 L118 336 L98 344 L98 440 L62 440 Z"/>
+          <path class="vessel red" data-id="pvn" d="M490 172 L548 164 L550 188 L494 196 Z M494 240 L550 244 L548 268 L490 264 Z"/>
+          <text class="lab sm" x="183" y="16" text-anchor="middle">SVC</text>
+          <text class="lab sm" x="80" y="456" text-anchor="middle">IVC</text>
+          <text class="lab sm" x="398" y="49" text-anchor="middle">Aort</text>
+          <text class="lab sm" x="486" y="118">Pulmoner gövde</text>
+          <text class="lab sm" x="556" y="219" text-anchor="middle">Pulm. venler</text>
+        </g>
+
+        <!-- Atriyumlar -->
+        <g id="atria">
+          <path class="wall" data-id="ra" d="M112 176 C86 160 96 126 132 136 C140 140 142 150 138 156 Z"/>
+          <path class="wall" data-id="ra" d="M100 200 C92 158 140 128 200 126 L262 134 L266 332 L124 336 C96 306 92 250 100 200 Z"/>
+          <path class="cavity deox" data-id="ra" d="M120 206 C116 172 156 150 204 150 L248 156 L250 314 L136 318 C116 292 112 250 120 206 Z"/>
+          <path class="wall" data-id="ias" d="M262 134 L294 140 L298 334 L266 332 Z"/>
+          <ellipse class="fossa" cx="281" cy="246" rx="6" ry="17"/>
+          <path class="wall" data-id="la" d="M470 150 C490 128 522 140 512 162 C506 174 492 178 484 172 Z"/>
+          <path class="wall" data-id="la" d="M294 140 L400 130 C462 128 498 170 498 218 C498 272 472 322 440 328 L298 334 Z"/>
+          <path class="cavity ox" data-id="la" d="M310 160 L400 152 C450 152 476 186 476 222 C476 264 456 300 432 306 L312 312 Z"/>
+          <text class="lab" x="176" y="236" text-anchor="middle">Sağ atriyum</text>
+          <text class="lab" x="398" y="236" text-anchor="middle">Sol atriyum</text>
+        </g>
+
+        <!-- Ventriküller -->
+        <g id="ventricles">
+          <path class="wall" data-id="rv" d="M112 346 L290 346 L302 566 C262 596 204 584 166 540 C122 490 102 420 112 346 Z"/>
+          <path class="cavity deox" data-id="rv" d="M126 360 L274 360 L284 538 C252 566 206 560 174 524 C138 482 120 420 126 360 Z"/>
+          <path class="wall" data-id="lv" d="M330 346 L496 340 C522 404 512 488 474 548 C440 600 388 624 340 614 L352 592 Z"/>
+          <path class="cavity ox" data-id="lv" d="M352 366 L474 360 C494 410 486 482 456 528 C430 566 398 586 372 584 Z"/>
+          <path class="wall" data-id="ivs" d="M286 346 L330 346 L352 592 L340 614 C318 604 306 586 300 566 Z"/>
+          <path class="wall" data-id="mod" d="M284 464 C256 468 226 474 198 482 L200 494 C228 486 258 480 286 478 Z"/>
+          <path class="wall" data-id="pap" d="M190 536 C182 510 186 486 196 478 C206 486 210 510 204 536 Z"/>
+          <path class="wall" data-id="pap" d="M460 500 C448 480 444 456 452 444 C466 452 474 476 476 495 Z"/>
+          <path class="wall" data-id="pap" d="M395 580 C388 552 392 526 402 516 C414 526 418 552 412 578 Z"/>
+          <g class="valvish" id="avValves"></g>
+          <text class="lab" x="200" y="430" text-anchor="middle">Sağ ventrikül</text>
+          <text class="lab" x="420" y="410" text-anchor="middle">Sol ventrikül</text>
+        </g>
+
+        <rect class="fibrous valvish" data-id="fib" x="108" y="333" width="392" height="13" rx="3"/>
+        <g class="valvish">
+          <path class="semilunar" data-id="aov" d="M302 118 Q307 128 311 118 Q316 128 321 118 Q326 128 330 118"/>
+          <path class="semilunar" data-id="pulv" d="M352 132 Q356 142 361 132 Q365 142 369 132 Q373 142 376 132"/>
+        </g>
+
+        <!-- İleti sistemi: atriyal -->
+        <g id="cond-atrial">
+          <path class="cond" data-id="int" d="M222 148 C250 162 262 200 266 250 C270 284 266 304 262 316"/>
+          <path class="cond" data-id="int" d="M212 152 C222 200 234 250 252 312"/>
+          <path class="cond" data-id="int" d="M204 150 C160 190 150 250 178 288 C204 312 232 318 248 320"/>
+          <path class="cond" data-id="bach" d="M222 140 C260 128 320 132 380 146 C420 154 450 160 470 172"/>
+          <ellipse class="cond node" data-id="sa" cx="214" cy="143" rx="13" ry="7"/>
+          <ellipse class="cond node" data-id="avn" cx="258" cy="322" rx="13" ry="7"/>
+        </g>
+        <!-- İleti sistemi: ventriküler -->
+        <g id="cond-vent">
+          <path class="cond thin" data-id="purk" id="purkRV" d="M282 500 C276 540 240 556 200 540 C165 520 140 480 132 420 C129 395 130 378 132 368"/>
+          <path class="cond thin" data-id="purk" id="purkLV" d="M356 420 C360 480 362 540 380 575 C410 580 440 560 458 525 C480 490 488 440 482 390 C480 378 478 370 476 366"/>
+          <path class="cond" data-id="his" d="M270 326 L286 340 L300 382"/>
+          <path class="cond" data-id="rbb" d="M300 382 C296 420 292 460 286 500 C282 528 274 544 262 552 M288 470 C262 474 226 480 200 488"/>
+          <path class="cond" data-id="lbb" d="M300 382 C312 384 322 388 332 392"/>
+          <path class="cond" data-id="laf" d="M332 392 C372 398 428 416 462 446"/>
+          <path class="cond" data-id="lpf" d="M332 392 C342 446 362 496 398 520"/>
+        </g>
+
+        <!-- Durumlara özel katman -->
+        <g id="special" hidden>
+          <ellipse id="flLoop" class="loop" cx="184" cy="282" rx="52" ry="26"/>
+          <g id="flDots"></g>
+          <g id="afWaves"></g>
+          <g id="blockAV" class="blockmark" hidden><path d="M248 312 L268 332 M268 312 L248 332"/></g>
+          <g id="blockLBB" class="blockmark" hidden><path d="M308 378 L326 398 M326 378 L308 398"/></g>
+        </g>
+
+        <!-- Otonom sinirler -->
+        <g id="nerves">
+          <path class="nerve" data-id="vagus" d="M22 24 C70 58 120 80 170 104 C190 114 202 126 208 136 M170 104 C118 150 100 232 140 292 C170 320 220 330 246 324"/>
+          <path class="nerve" data-id="symp" d="M580 24 C540 58 482 80 420 94 C340 110 262 120 226 136 M420 94 C352 160 300 246 272 316 M552 46 C566 200 556 380 508 470 M538 300 C520 318 506 328 492 334 M548 404 L516 424"/>
+          <circle class="ganglion" data-id="vagus" cx="22" cy="24" r="6"/>
+          <circle class="ganglion" data-id="symp" cx="580" cy="24" r="6"/>
+          <text class="lab sm" x="34" y="28">N. vagus</text>
+          <text class="lab sm" x="566" y="28" text-anchor="end">Sempatik lifler</text>
+        </g>
+      </svg>
+      <div class="tip" id="tip" hidden></div>
+      <div class="legend" id="legend">
+        <span><i class="sw" style="background:var(--cond)"></i>Çalışan ileti yolu</span>
+        <span><i class="sw" style="background:var(--cond-dim)"></i>Çalışmayan ileti yolu</span>
+        <span><i class="sw" style="background:repeating-linear-gradient(90deg,var(--cond) 0 6px,transparent 6px 10px)"></i>Otonom sinir</span>
+        <span><i class="sw dot" style="background:var(--muscle-hi)"></i>Kasılan kas</span>
+        <span id="lgAf" hidden><i class="sw dot" style="background:var(--af)"></i>Titreyen (fibrile) kas</span>
+        <span><i class="sw dot" style="background:var(--blood-d)"></i>Oksijeni az kan</span>
+        <span><i class="sw dot" style="background:var(--blood-o)"></i>Oksijenli kan</span>
+      </div>
+    </section>
+
+    <aside class="panel" id="panel" aria-live="polite"></aside>
+  </div>
+
+  <section class="monitor" id="monitor" hidden aria-label="Örnek EKG">
+    <div class="cv">
+      <canvas id="ecg" aria-label="Kayan örnek EKG çizgisi, derivasyon II"></canvas>
+      <div class="mlabel">DII</div>
+      <div class="mlabel2">25 mm/sn · 10 mm/mV · örnek (sentetik)</div>
+    </div>
+    <div class="read">
+      <div><div class="eyebrow">Ventrikül hızı</div><div class="hr"><span id="hrv">--</span><small>/dk</small></div></div>
+      <dl id="readDl"></dl>
+    </div>
+  </section>
+
+  <footer>
+    <div><strong>Tıbbi tavsiye değildir.</strong> Bu sayfa eğitim amaçlı, basitleştirilmiş bir modeldir. Çizim şematiktir; boyutlar ve yerleşimler orantılı değildir. EKG çizgileri gerçek hastadan değil, formülle üretilmiş örneklerdir.</div>
+    <div>Sarı kesikli kutular, tartışmalı veya bilerek basitleştirilmiş noktaları gösterir.</div>
+  </footer>
+</div>
+
+<script>
+(function(){
+'use strict';
+/* ---------------- İçerik ---------------- */
+const KIND = {kas:'Kas',ileti:'İleti sistemi',sinir:'Otonom sinir',kapak:'Kapak / iskelet',damar:'Damar'};
+const S = {
+  ra:{n:'Sağ atriyum',l:'Atrium dextrum',k:'kas',
+    d:'İnce duvarlı (~2 mm) toplama odacığı. Üst ve alt ana toplardamarlardan (SVC, IVC) ve koroner sinüsten gelen oksijeni az kanı alır. Duvarında pektinat kaslar ve aurikula (kulakçık) bulunur; crista terminalis düz ve kaslı bölümleri ayırır.',
+    f:'Diyastol sonunda kasılarak sağ ventrikülün dolumuna katkı yapar. SA düğüm bu odacığın duvarındadır.',
+    c:'Tipik atriyal flutter bu odacıkta, triküspit kapak halkası çevresinde dönen bir re-entry devresidir.'},
+  la:{n:'Sol atriyum',l:'Atrium sinistrum',k:'kas',
+    d:'Akciğerlerden pulmoner venlerle gelen oksijenli kanı alır. Duvarı sağ atriyumdan biraz kalındır. Sol aurikula (sol atriyal apendiks) dar, parmak biçimli bir kesedir.',
+    f:'Atriyal kasılma ventrikül dolumunun yaklaşık %15–30’unu sağlar (atriyal katkı). Bu pay egzersizde ve ileri yaşta artar.',
+    c:'Pulmoner ven ağızlarına uzanan kas kılıfları AF’yi başlatan erken uyarıların en sık kaynağıdır; ablasyonda pulmoner ven izolasyonu bu yüzden yapılır. AF’de pıhtı en sık sol aurikulada oluşur.'},
+  ias:{n:'İnteratriyal septum',l:'Septum interatriale',k:'kas',
+    d:'İki atriyumu ayıran duvar. Ortasındaki çukur (fossa ovalis), fetal dönemdeki foramen ovale’nin kalıntısıdır.',
+    f:'AV düğüm bu septumun alt kısmında, Koch üçgeni içinde yer alır.',
+    c:'Yetişkinlerin yaklaşık dörtte birinde foramen ovale tam kapanmaz (PFO). Atriyal septal defekt (ASD) doğumsal bir açıklıktır.'},
+  rv:{n:'Sağ ventrikül',l:'Ventriculus dexter',k:'kas',
+    d:'Kesitte hilal şeklindedir ve sol ventrikülün önüne sarılır. Duvar kalınlığı ~3–5 mm, iç yüzü kaba trabeküllüdür. Üç papiller kası vardır (ön, arka, septal).',
+    f:'Kanı düşük basınçlı akciğer dolaşımına pompalar (sistolik basınç ~25 mmHg).',
+    c:'Pulmoner emboli ve pulmoner hipertansiyonda zorlanır. Sağ ventrikül enfarktüsü çoğunlukla alt duvar enfarktüsüyle birlikte görülür.'},
+  lv:{n:'Sol ventrikül',l:'Ventriculus sinister',k:'kas',
+    d:'Kalbin en kalın duvarlı odacığı (~8–12 mm). Konik şekliyle kalbin tepesini (apeks) oluşturur. Kas lifleri sarmal (helis) düzende dizilir: iç katmanda sağ, dış katmanda sol yönlü.',
+    f:'Kanı aort yoluyla tüm vücuda pompalar (sistolik basınç ~120 mmHg). Sarmal düzen kasılırken bükülme (twist) hareketi oluşturur. Normal ejeksiyon fraksiyonu yaklaşık %55–70.',
+    c:'Hipertansiyonda kalınlaşır (hipertrofi). Miyokard enfarktüsünde en sık etkilenen odacıktır.'},
+  ivs:{n:'İnterventriküler septum',l:'Septum interventriculare',k:'kas',
+    d:'İki ventrikülü ayıran duvar. Büyük kısmı kastır; en üstte ince bir zar (membranöz) bölüm vardır. His demeti bu bölümün alt kenarından geçer, dallar septumun iki yüzünden aşağı iner.',
+    f:'Kasılırken sol ventrikülün bir parçası gibi çalışır. Ventriküllerde elektriksel olarak ilk uyarılan bölgedir (soldan sağa); EKG’deki küçük septal q dalgası buradan gelir.',
+    c:'Ventriküler septal defekt (VSD) en sık doğumsal kalp kusurlarındandır. Hipertrofik kardiyomiyopatide septum belirgin kalınlaşabilir.'},
+  pap:{n:'Papiller kaslar',l:'Musculi papillares',k:'kas',
+    d:'Ventrikül duvarından çıkan koni biçimli kaslar. Korda tendinea adlı ince kirişlerle AV kapak yaprakçıklarına bağlanır. Sol ventrikülde iki (anterolateral, posteromedial), sağ ventrikülde üç papiller kas vardır.',
+    f:'Kapakları açmazlar. Sistolde kasılıp kirişleri gererek yaprakçıkların atriyuma doğru ters dönmesini (prolapsus) önlerler.',
+    c:'Posteromedial papiller kas çoğunlukla tek bir damardan beslendiği için enfarktüste kopmaya daha yatkındır; bu akut, ağır mitral yetersizliği yapar.',
+    note:'Çizimde sağ ventrikülde yalnızca ön papiller kas gösterilmiştir.'},
+  mod:{n:'Moderatör bant',l:'Trabecula septomarginalis',k:'kas',
+    d:'Sağ ventrikülde septumdan ön papiller kasın tabanına uzanan kas köprüsü.',
+    f:'İçinden sağ dalın bir kolu geçer. Böylece ön papiller kas erken uyarılır ve triküspit kapak zamanında gerilir.'},
+  fib:{n:'Fibröz iskelet',l:'Skeleton fibrosum cordis',k:'kapak',
+    d:'Dört kapağın halkalarını taşıyan sert bağ dokusu çatısı. Atriyum kaslarını ventrikül kaslarından ayırır.',
+    f:'Elektriksel yalıtkandır. Bu yüzden uyarı ventriküllere yalnızca AV düğüm ve His demeti yolundan geçebilir.',
+    c:'Bu yalıtımı aşan ek bir kas bağlantısı (aksesuar yol) WPW sendromuna yol açar.',
+    note:'Gerçekte halkalar ve bir gövdeden oluşan üç boyutlu bir yapıdır; burada düz bir bant olarak çizildi.'},
+  tri:{n:'Triküspit kapak',l:'Valva atrioventricularis dextra',k:'kapak',
+    d:'Sağ atriyum ile sağ ventrikül arasındaki üç yaprakçıklı kapak.',
+    f:'Diyastolde açılır, sistolde kapanarak kanın sağ atriyuma kaçmasını önler. Kapanışı birinci kalp sesine (S1) katkı yapar.',
+    note:'Kesit görünümünde iki yaprakçık çizildi.'},
+  mit:{n:'Mitral kapak',l:'Valva atrioventricularis sinistra (bikuspit)',k:'kapak',
+    d:'Sol atriyum ile sol ventrikül arasındaki iki yaprakçıklı (ön ve arka) kapak.',
+    f:'Sistolde kapanarak sol atriyuma geri akışı önler. Kapanışı S1’in ana bileşenidir.',
+    c:'Mitral darlık, mitral yetersizlik ve mitral kapak prolapsusu sık görülen kapak hastalıklarıdır. Romatizmal mitral darlık AF için güçlü bir risk etkenidir.'},
+  aov:{n:'Aort kapağı',l:'Valva aortae',k:'kapak',
+    d:'Sol ventrikül ile aort arasında üç yarımay biçimli yaprakçıktan oluşan kapak. Koroner arterler kapağın hemen üstündeki sinüslerden çıkar.',
+    f:'Sistolde açılır, diyastolde kapanır. Kapanışı ikinci kalp sesinin (S2) aort bileşenidir.',
+    note:'Dört boşluk kesitinde görünmez; yeri temsili olarak gösterildi.'},
+  pulv:{n:'Pulmoner kapak',l:'Valva trunci pulmonalis',k:'kapak',
+    d:'Sağ ventrikül çıkış yolu ile pulmoner gövde arasında üç yarımay biçimli yaprakçıktan oluşan kapak.',
+    f:'Sistolde açılır, diyastolde kapanarak akciğer dolaşımından geri akışı önler.',
+    note:'Dört boşluk kesitinde görünmez; yeri temsili olarak gösterildi.'},
+  aorta:{n:'Aort',l:'Aorta',k:'damar',d:'Sol ventrikülden çıkan ana atardamar. Kemerinden baş, boyun ve kollara giden üç dal ayrılır.',f:'Oksijenli kanı tüm vücuda dağıtır.'},
+  pt:{n:'Pulmoner gövde',l:'Truncus pulmonalis',k:'damar',d:'Sağ ventrikülden çıkar ve sağ ile sol pulmoner arterlere ayrılır.',f:'Oksijeni az kanı akciğerlere taşır. Atardamar olduğu halde oksijeni az kan taşıdığı için mavi çizildi.'},
+  svc:{n:'Üst ana toplardamar (SVC)',l:'Vena cava superior',k:'damar',d:'Baş, boyun ve kollardan gelen kanı sağ atriyuma getirir.',f:'SA düğüm bu damarın sağ atriyuma girdiği yerde bulunur.'},
+  ivc:{n:'Alt ana toplardamar (IVC)',l:'Vena cava inferior',k:'damar',d:'Gövde ve bacaklardan gelen kanı sağ atriyuma getirir.',c:'IVC ile triküspit halka arasındaki doku şeridi (kavotriküspit istmus), tipik flutter ablasyonunun hedefidir.'},
+  pvn:{n:'Pulmoner venler',l:'Venae pulmonales',k:'damar',d:'Akciğerlerden oksijenli kanı sol atriyuma getiren dört toplardamar (çizimde iki tanesi gösterildi).',c:'Ağızlarındaki kas kılıfları AF’yi başlatan erken uyarıların en sık kaynağıdır.'},
+  sa:{n:'Sinoatriyal (SA) düğüm',l:'Nodus sinuatrialis',k:'ileti',
+    d:'Kalbin doğal pil merkezi. Sağ atriyumun üst kısmında, SVC’nin girişinde, crista terminalis’in üst ucunda ve epikarda yakın yerleşir. Hücreleri dinlenme fazında kendiliğinden depolarize olur (HCN kanalları, “funny” akım, If), bu yüzden dışarıdan uyarı gerekmeden ritim üretir.',
+    f:'Normalde dakikada 60–100 uyarı üretir ve tüm kalbin hızını belirler. Kendi iç hızı ~100/dk civarındadır; dinlenmedeki daha düşük hız vagal tonustan kaynaklanır.',
+    b:'SA nodal arter: kişilerin yaklaşık %60’ında sağ koroner arterden (RCA), kalanında sol sirkumfleks arterden (LCx).',
+    c:'Hasta sinüs sendromu, sinüs bradikardisi ve sinüs duraklamaları. AF’de SA düğümün uyarıları atriyumdaki kaotik aktivite içinde kaybolur.'},
+  int:{n:'İnternodal yollar',l:'Tractus internodales (anterior, orta, posterior)',k:'ileti',
+    d:'SA düğümden AV düğüme uzanan tercihli iletim hatları: anterior (Bachmann dalını verir), orta (Wenckebach) ve posterior (Thorel).',
+    f:'Uyarıyı atriyum duvarı boyunca AV düğüme yaklaşık 30–50 ms içinde ulaştırır.',
+    note:'Tartışmalı: Bu yolların His demeti gibi yalıtılmış ayrı demetler olduğu histolojik olarak gösterilememiştir. Çoğu kaynak bunları kas liflerinin dizilişinden doğan hızlı iletim hatları olarak kabul eder. Üç çizgi şematiktir.'},
+  bach:{n:'Bachmann demeti',l:'Fasciculus interauricularis',k:'ileti',
+    d:'Sağ atriyumdan sol atriyuma uzanan, atriyumların ön-üst duvarındaki kalın kas bandı.',
+    f:'Sol atriyumun hızlı ve eş zamanlı uyarılmasını sağlar.',
+    c:'İletimi bozulursa interatriyal blok gelişir: P dalgası uzar (≥120 ms) ve çentikli olur. İleri derecesi AF riskiyle ilişkilidir (Bayés sendromu).'},
+  avn:{n:'Atriyoventriküler (AV) düğüm',l:'Nodus atrioventricularis',k:'ileti',
+    d:'İnteratriyal septumun alt kısmında, Koch üçgeninin tepesinde (Todaro tendonu, triküspit septal yaprakçığı ve koroner sinüs ağzı arasında) yer alır.',
+    f:'Uyarıyı bilerek yavaşlatır (~0,1 sn); böylece atriyumlar kasılmayı bitirip ventrikülleri doldurur. Süzgeç görevi de görür: AF’de dakikada yüzlerce atriyal uyarıdan yalnızca bir kısmı ventriküle geçer. Üstteki odaklar susarsa 40–60/dk kaçış ritmi üretebilir.',
+    b:'Kişilerin çoğunda (%80–90) RCA’dan çıkan AV nodal arter.',
+    c:'Birinci, ikinci ve üçüncü derece AV bloklar; AV düğüm içi re-entry taşikardisi (AVNRT). Beta blokerler, kalsiyum kanal blokerleri ve digoksin bu düğümde iletimi yavaşlatır.'},
+  his:{n:'His demeti',l:'Fasciculus atrioventricularis',k:'ileti',
+    d:'AV düğümün devamı. Santral fibröz gövdeyi delerek membranöz septumun alt kenarı boyunca ilerler.',
+    f:'Fibröz iskelet atriyumları ventriküllerden yalıttığı için, normal kalpte atriyumdan ventriküle geçen tek elektriksel yol budur. His–ventrikül (HV) aralığı normalde 35–55 ms.',
+    c:'WPW gibi aksesuar yol durumlarında bu kural bozulur. His demeti pacing, ventrikülleri doğal yoldan uyarmayı amaçlayan bir kalp pili tekniğidir.'},
+  rbb:{n:'Sağ dal',l:'Crus dextrum fasciculi atrioventricularis',k:'ileti',
+    d:'İnterventriküler septumun sağ yüzünden ince bir kordon gibi iner; bir kolu moderatör bantla sağ ventrikülün ön papiller kasına ulaşır.',
+    f:'Sağ ventrikül iç yüzündeki Purkinje ağını besler.',
+    c:'Sağ dal bloğu (RBBB): QRS ≥120 ms, V1’de rSR′ (“tavşan kulağı”), I ve V6’da geniş S. Sağlıklı kişilerde de görülebilir.'},
+  lbb:{n:'Sol dal',l:'Crus sinistrum fasciculi atrioventricularis',k:'ileti',
+    d:'His demetinden septumun sol yüzüne geçen kalın, yelpaze biçimli dal. Kısa bir gövdeden sonra sol anterior ve sol posterior fasiküllere ayrılır (bazı kaynaklar bir septal fasikül de tanımlar).',
+    f:'Septumu soldan sağa ilk uyaran yapıdır.',
+    c:'Sol dal bloğu (LBBB): QRS ≥120 ms, V1’de geniş derin S, I ve V6’da geniş çentikli R, septal q kaybı. Yeni gelişen LBBB yapısal kalp hastalığını düşündürür.'},
+  laf:{n:'Sol anterior fasikül',l:'Fasciculus anterior sinister',k:'ileti',
+    d:'Sol dalın ince ve uzun kolu. Sol ventrikülün ön-üst bölümüne ve anterolateral papiller kasa gider.',
+    c:'İnce olduğu ve tek damardan beslendiği için en sık bloklanan fasiküldür. Sol anterior fasiküler blokta belirgin sol aks sapması (yaklaşık −45° ve ötesi) görülür.'},
+  lpf:{n:'Sol posterior fasikül',l:'Fasciculus posterior sinister',k:'ileti',
+    d:'Kısa ve kalın kol. Sol ventrikülün arka-alt duvarına ve posteromedial papiller kasa yayılır.',
+    c:'İki kaynaktan beslendiği için tek başına bloğu nadirdir; blokta sağ aks sapması görülür.'},
+  purk:{n:'Purkinje lifleri',l:'Rami subendocardiales',k:'ileti',
+    d:'Endokardın hemen altında ağ oluşturan geniş çaplı iletim hücreleri. Yaklaşık 2–4 m/sn hızla kalbin en hızlı ileten dokusudur.',
+    f:'Ventriküllerin iç yüzünü neredeyse aynı anda uyarır. Uyarı içten dışa (endokarttan epikarda) ve tepeden tabana doğru yayılır; böylece kan yukarıya, çıkış yollarına doğru sıkılır. Üstteki odaklar susarsa 20–40/dk kaçış ritmi üretebilir.',
+    note:'Dal ağı şematik çizildi.'},
+  vagus:{n:'Vagus siniri (parasempatik)',l:'N. vagus, rami cardiaci',k:'sinir',
+    d:'Beyin sapından çıkar. Kalp dalları kardiyak pleksus üzerinden ağırlıkla SA ve AV düğüme ve atriyumlara ulaşır; ventriküllerdeki etkisi sınırlıdır.',
+    f:'Asetilkolin M2 reseptörlerine bağlanır: kalp hızını düşürür ve AV iletimi yavaşlatır. Genel eğilim olarak sağ vagus daha çok SA düğümü, sol vagus daha çok AV düğümü etkiler.',
+    c:'Dinlenmede vagal tonus baskındır. Vagal manevralar (ör. Valsalva) bazı supraventriküler taşikardileri durdurabilir. Vazovagal bayılma bu sistemin aşırı tepkisidir.',
+    note:'Sinirlerin kalp yüzeyindeki seyri şematik çizildi.'},
+  symp:{n:'Sempatik kardiyak sinirler',l:'Nn. cardiaci (servikal ve üst torasik ganglionlar)',k:'sinir',
+    d:'Servikal ganglionlardan ve üst torasik (T1–T4/5) segmentlerden çıkan lifler kardiyak pleksusta birleşir; düğümlere ve ventriküller dahil tüm kalp kasına dağılır.',
+    f:'Noradrenalin β1 reseptörlerine bağlanır: hız (kronotropi), AV iletim (dromotropi), kasılma gücü (inotropi) ve gevşeme hızı (lusitropi) artar.',
+    c:'Egzersiz, stres, ateş ve kan kaybında devreye girer. Beta blokerler bu etkiyi azaltır.',
+    note:'Sinirlerin kalp yüzeyindeki seyri şematik çizildi.'}
+};
+const GROUPS = [
+  ['Kaslar ve odacıklar',['ra','la','ias','rv','lv','ivs','pap','mod']],
+  ['İleti sistemi',['sa','int','bach','avn','his','rbb','lbb','laf','lpf','purk']],
+  ['Otonom sinirler',['vagus','symp']],
+  ['Kapaklar ve iskelet',['tri','mit','aov','pulv','fib']],
+  ['Damarlar',['aorta','pt','svc','ivc','pvn']]
+];
+const ALL_COND = ['sa','int','bach','avn','his','rbb','lbb','laf','lpf','purk'];
+
+const COND = {
+  nsr:{n:'Normal sinüs ritmi',tag:'Normal',atrial:'sinus',rate:72,pr:0.16,conducts:true,qrs:'narrow',sv:0.05,
+    off:[],nerveOn:['vagus'],
+    sum:'Her atım SA düğümde başlar, atriyumlara yayılır, AV düğümde kısa bir süre bekler ve His–Purkinje sistemiyle ventriküllere hızla dağılır.',
+    ecg:['Hız 60–100/dk, RR aralıkları düzenli','Her QRS’ten önce bir P dalgası; P, DII’de pozitif','PR aralığı 120–200 ms','QRS < 120 ms (dar)'],
+    mus:'Önce atriyumlar, yaklaşık 0,15 sn sonra ventriküller kasılır.',
+    ner:'Tüm ileti yolları çalışıyor. Dinlenmede vagal (parasempatik) tonus baskın olduğu için vagus parlak, sempatik lifler koyu gösterildi.',
+    note:'Gerçekte iki otonom sistem de sürekli bir miktar aktiftir; parlak/koyu ayrımı baskın olanı gösterir. Solunuma bağlı hafif hız değişimi (sinüs aritmisi) eklendi.',
+    read:{Ritim:'Düzenli',P:'Var, her QRS’ten önce',PR:'160 ms',QRS:'Dar (~80 ms)'}},
+  af:{n:'Atriyal fibrilasyon (AF)',tag:'Taşiaritmi',atrial:'af',vent:'af',qrs:'narrow',
+    off:['sa','int','bach'],nerveOn:[],
+    sum:'Atriyumlarda düzenli bir uyarı yerine, birbirini kesen çok sayıda küçük dalgacık dolaşır (dakikada ~350–600 düzensiz aktivasyon). SA düğümün uyarıları bu kaos içinde kaybolur. AV düğüm bu uyarıların ancak bir kısmını, düzensiz aralıklarla ventriküllere geçirir.',
+    ecg:['P dalgası yok; yerine düzensiz fibrilasyon (f) dalgaları','RR aralıkları “düzensiz düzensiz”','QRS genellikle dar (ventriküllerdeki ileti normal)','Tedavisiz ventrikül hızı sıklıkla 100–160/dk'],
+    mus:'Atriyumlar titrer ama etkili kasılmaz (turuncu). Ventriküller düzensiz aralıklarla kasılır; kısa aralıktan sonraki atımlarda dolum az olduğundan bazı atımlar bilekte nabız olarak hissedilmeyebilir (nabız açığı).',
+    ner:'SA düğüm, internodal yollar ve Bachmann demeti düzenli iletim yapmadığı için koyu. AV düğüm ve altındaki sistem çalışıyor. Kıvılcımlar pulmoner ven ağızlarındaki tetikleyici odakları temsil eder.',
+    cli:'Atriyal kasılmanın kaybı ve sol aurikulada kanın durgunlaşması pıhtıya, dolayısıyla inmeye zemin hazırlar. İnme riski CHA₂DS₂-VASc skoruyla değerlendirilir.',
+    note:'Dalgacıklar rastgele üretilir, gerçek bir haritalamayı temsil etmez. Otonom sinirlerin AF’deki rolü kişiden kişiye değiştiği için ikisi de koyu bırakıldı.',
+    read:{Ritim:'Düzensiz düzensiz',P:'Yok, f dalgaları',PR:'Ölçülemez',QRS:'Dar (~80 ms)'}},
+  flutter:{n:'Atriyal flutter (2:1)',tag:'Taşiaritmi',atrial:'flutter',vent:'flutter',qrs:'narrow',
+    off:['sa','int'],nerveOn:[],
+    sum:'Sağ atriyumda, triküspit kapak halkası çevresinde dönen tek ve büyük bir re-entry devresi vardır. Uyarı septum boyunca yukarı, yan duvar boyunca aşağı iner ve IVC ile triküspit halka arasındaki şeritten (kavotriküspit istmus) geçerek turu tamamlar. AV düğüm genellikle her iki dalgadan birini geçirir.',
+    ecg:['DII, DIII ve aVF’de testere dişi görünümlü flutter (F) dalgaları, ~300/dk','Düzenli RR; 2:1 iletimde ventrikül hızı ~150/dk','QRS dar','Düz izoelektrik çizgi kaybolur'],
+    mus:'Atriyumlar hızlı ve zayıf kasılır. Ventriküller düzenli ama hızlı kasılır.',
+    ner:'SA düğüm ve internodal yollar baskılanmış (koyu). Devre ve Bachmann demeti (sol atriyuma yayılım) çalışıyor. AV düğüm her ikinci dalgayı geçiriyor.',
+    cli:'Kavotriküspit istmus ablasyonuyla yüksek oranda tedavi edilebilir. Hızı sabit ~150/dk olan dar QRS’li taşikardide flutter akla gelmelidir.',
+    note:'Devre, iki boyutlu çizimde sağ atriyumda bir halka olarak gösterildi; gerçekte triküspit halkayı saran üç boyutlu bir yoldur.',
+    read:{Ritim:'Düzenli',P:'Yok, F dalgaları (~300/dk)',PR:'Ölçülemez',QRS:'Dar (~80 ms)'}},
+  tachy:{n:'Sinüs taşikardisi',tag:'Çoğunlukla ikincil',atrial:'sinus',rate:125,pr:0.13,conducts:true,qrs:'narrow',sv:0.01,
+    off:[],nerveOn:['symp'],
+    sum:'Ritim yine SA düğümden başlar, yalnızca hızlıdır. Çoğu zaman bir duruma verilen normal tepkidir: egzersiz, ateş, ağrı, kaygı, kansızlık, kan kaybı veya hipertiroidi.',
+    ecg:['Hız > 100/dk','Her QRS’ten önce normal P dalgası','PR ve QT kısalır','Hız arttıkça P dalgası önceki T dalgasına yaklaşır'],
+    mus:'Atriyumlar ve ventriküller normal sırayla ama daha sık kasılır; dolum süresi (diyastol) kısalır.',
+    ner:'Sempatik lifler çalışıyor (parlak), vagal tonus azalmış (koyu).',
+    cli:'Tedavi altta yatan nedene yöneliktir.',
+    read:{Ritim:'Düzenli',P:'Var, her QRS’ten önce',PR:'130 ms',QRS:'Dar (~80 ms)'}},
+  brady:{n:'Sinüs bradikardisi',tag:'Çoğunlukla zararsız',atrial:'sinus',rate:48,pr:0.18,conducts:true,qrs:'narrow',sv:0.06,
+    off:[],nerveOn:['vagus'],
+    sum:'SA düğüm normalden yavaş uyarı üretir; iletim normaldir. Sporcularda ve uykuda normal olabilir. İlaçlar (beta bloker), hipotiroidi, hipotermi veya SA düğüm hastalığı da neden olabilir.',
+    ecg:['Hız < 60/dk','Normal P dalgaları, PR normal','QRS dar, QT görece uzun'],
+    mus:'Normal sırayla, daha seyrek kasılma; dolum süresi uzundur.',
+    ner:'Vagus baskın (parlak), sempatik etki düşük (koyu).',
+    cli:'Belirti yoksa çoğunlukla tedavi gerekmez. Baş dönmesi veya bayılma varsa değerlendirilmelidir.',
+    read:{Ritim:'Düzenli',P:'Var, her QRS’ten önce',PR:'180 ms',QRS:'Dar (~80 ms)'}},
+  avb3:{n:'Tam (3. derece) AV blok',tag:'İleti bozukluğu',atrial:'sinus',rate:75,pr:0.16,conducts:false,vent:'escape',esc:45,qrs:'narrow',sv:0,
+    off:['avn'],nerveOn:[],
+    sum:'Atriyal uyarıların hiçbiri ventriküllere geçmez. Atriyumlar SA düğümün ritmiyle, ventriküller ise bağımsız bir kaçış odağının ritmiyle çalışır (AV dissosiyasyon). Bu örnekte kaçış ritmi His demeti bölgesinden (junctional) geliyor.',
+    ecg:['P dalgaları ve QRS kompleksleri birbirinden bağımsız','P hızı QRS hızından fazla','Junctional kaçışta dar QRS, 40–60/dk; ventriküler kaçışta geniş QRS, 20–40/dk','Bazı P dalgaları QRS veya T içine gömülür'],
+    mus:'Atriyumlar ve ventriküller birbirinden habersiz kasılır. Atriyum bazen kapalı triküspit kapağa karşı kasılır (boyun venlerinde “top” a dalgaları).',
+    ner:'AV düğüm bloklu (koyu, kırmızı işaret). SA düğüm ve atriyal yollar çalışıyor; His demeti ve aşağısı kaçış ritmini iletiyor.',
+    cli:'Çoğunlukla kalıcı kalp pili gerektirir. Kaçış ritmi yavaş ve güvenilmez olabileceğinden acil durumdur.',
+    note:'Kaçış odağı olarak junctional (His bölgesi) örneği seçildi.',
+    read:{Ritim:'Ventrikül düzenli, P’den bağımsız',P:'Var, atriyum 75/dk',PR:'Değişken (ilişki yok)',QRS:'Dar (junctional kaçış)'}},
+  lbbb:{n:'Sol dal bloğu (LBBB)',tag:'İleti bozukluğu',atrial:'sinus',rate:75,pr:0.16,conducts:true,qrs:'lbbb',sv:0.02,lvDelay:0.07,
+    off:['lbb','laf','lpf'],nerveOn:[],
+    sum:'Uyarı sol dalda ilerleyemez. Sağ ventrikül sağ dal üzerinden normal uyarılır; sol ventrikül ise uyarıyı septumdan, kas hücresinden hücresine yavaşça alır. QRS genişler ve iki ventrikül arasında kasılma uyumsuzluğu (dissenkroni) oluşur.',
+    ecg:['QRS ≥ 120 ms','V1’de geniş, derin S (QS veya rS)','I, aVL, V5–V6’da geniş, çentikli R; septal q yok','ST–T değişiklikleri QRS’in ters yönünde'],
+    mus:'Sağ ventrikül önce, sol ventrikül yaklaşık 60–80 ms gecikmeyle kasılır.',
+    ner:'Sol dal ve fasiküller koyu (blok). Diğer yollar çalışıyor.',
+    cli:'Yeni gelişen LBBB araştırılmalıdır. Düşük ejeksiyon fraksiyonuyla birlikteyse kardiyak resenkronizasyon tedavisi (CRT) gündeme gelir.',
+    note:'Monitördeki derivasyon DII’dir. LBBB’nin asıl tanı kriterleri V1 ve V6’dadır; buradaki DII dalga şekli yaklaşık bir temsildir.',
+    read:{Ritim:'Düzenli',P:'Var, her QRS’ten önce',PR:'160 ms',QRS:'Geniş (~150 ms)'}}
+};
+
+/* ---------------- SVG kurulum ---------------- */
+const NS='http://www.w3.org/2000/svg';
+const svg=document.getElementById('heart');
+const mk=(tag,attrs,parent)=>{const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e;};
+
+// AV kapak yaprakçıkları ve kirişler
+const LEAF=[
+  {id:'tri',p:[142,346],len:54,dir:1,pap:[196,478]},
+  {id:'tri',p:[254,346],len:54,dir:-1,pap:[196,478]},
+  {id:'mit',p:[348,346],len:64,dir:1,pap:[402,516]},
+  {id:'mit',p:[468,346],len:58,dir:-1,pap:[452,446]}
+];
+const avG=document.getElementById('avValves');
+LEAF.forEach(L=>{L.ch=mk('line',{class:'chord'},avG);});
+LEAF.forEach(L=>{L.el=mk('line',{class:'leaf','data-id':L.id},avG);});
+function setLeaves(open){ // 0 kapalı .. 1 açık
+  const a=open*1.15;
+  LEAF.forEach(L=>{
+    const tx=L.p[0]+L.dir*L.len*Math.cos(a), ty=L.p[1]+L.len*Math.sin(a);
+    L.el.setAttribute('x1',L.p[0]);L.el.setAttribute('y1',L.p[1]);L.el.setAttribute('x2',tx.toFixed(1));L.el.setAttribute('y2',ty.toFixed(1));
+    L.ch.setAttribute('x1',tx.toFixed(1));L.ch.setAttribute('y1',ty.toFixed(1));L.ch.setAttribute('x2',L.pap[0]);L.ch.setAttribute('y2',L.pap[1]);
+  });
+}
+setLeaves(0.45);
+
+// Purkinje dal uçları
+const cvg=document.getElementById('cond-vent');
+[['purkRV',[205,455]],['purkLV',[420,470]]].forEach(([id,ctr])=>{
+  const p=document.getElementById(id), len=p.getTotalLength(); let d='';
+  for(let i=1;i<=11;i++){
+    const pt=p.getPointAtLength(len*i/12); let vx=pt.x-ctr[0], vy=pt.y-ctr[1]; const m=Math.hypot(vx,vy)||1; vx/=m;vy/=m;
+    const ex=pt.x+vx*9, ey=pt.y+vy*9;
+    d+=`M${pt.x.toFixed(1)} ${pt.y.toFixed(1)} L${ex.toFixed(1)} ${ey.toFixed(1)} M${ex.toFixed(1)} ${ey.toFixed(1)} l${(vx*5-vy*4).toFixed(1)} ${(vy*5+vx*4).toFixed(1)} M${ex.toFixed(1)} ${ey.toFixed(1)} l${(vx*5+vy*4).toFixed(1)} ${(vy*5-vx*4).toFixed(1)} `;
+  }
+  mk('path',{class:'cond thin','data-id':'purk',d},cvg);
+});
+
+// Nabız kopyaları ve tıklama alanları
+const condEls=[...svg.querySelectorAll('.cond')];
+condEls.forEach(el=>{
+  const pulse=el.cloneNode(); pulse.removeAttribute('data-id'); pulse.removeAttribute('id'); pulse.setAttribute('class','pulse'); pulse.style.opacity=0;
+  el.after(pulse); el._pulse=pulse;
+  if(el.tagName==='path'){el._len=el.getTotalLength(); pulse.style.strokeDasharray=`0 ${el._len}`;}
+  const hit=el.cloneNode(); hit.removeAttribute('id'); hit.setAttribute('class','hit');
+  if(el.tagName==='ellipse'){hit.setAttribute('rx',+el.getAttribute('rx')+8);hit.setAttribute('ry',+el.getAttribute('ry')+8);}
+  pulse.after(hit);
+});
+svg.querySelectorAll('.nerve').forEach(el=>{const hit=el.cloneNode();hit.setAttribute('class','hit');el.after(hit);});
+svg.querySelectorAll('[data-id]').forEach(el=>{
+  if(!el.classList.contains('hit')&&!el.classList.contains('cavity')) el.classList.add('sel-able');
+});
+
+/* ---------------- Durum / seçim ---------------- */
+let mode='anatomi', selected='sa', condKey='nsr';
+const panel=document.getElementById('panel');
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function structHTML(id,compact){
+  const s=S[id]; if(!s) return '';
+  let h=`<div><div class="eyebrow">${compact?'Seçili yapı':'İnceleniyor'}</div>${compact?`<h4>${esc(s.n)}</h4>`:`<h2>${esc(s.n)}</h2>`}<div class="latin">${esc(s.l)}</div><div style="margin-top:8px"><span class="chip k-${s.k}">${KIND[s.k]}</span></div></div>`;
+  if(compact){
+    h+=`<p>${esc(s.d)}</p>`;
+    const st=stateOf(id); if(st) h+=`<p><span class="${st.cls}">● ${st.t}</span></p>`;
+    return `<div class="sel-mini">${h}</div>`;
+  }
+  h+=`<p>${esc(s.d)}</p><dl class="facts">`;
+  if(s.f) h+=`<div><dt>Görevi</dt><dd>${esc(s.f)}</dd></div>`;
+  if(s.b) h+=`<div><dt>Kanlanma</dt><dd>${esc(s.b)}</dd></div>`;
+  if(s.c) h+=`<div><dt>Klinik not</dt><dd>${esc(s.c)}</dd></div>`;
+  h+='</dl>';
+  if(s.note) h+=`<div class="note"><b>Basitleştirme / tartışmalı</b>${esc(s.note)}</div>`;
+  return h;
+}
+function indexHTML(){
+  return '<div class="index">'+GROUPS.map(([g,ids])=>`<div><h3>${g}</h3><div class="row">${ids.map(i=>`<button type="button" data-pick="${i}" aria-pressed="${i===selected}">${esc(S[i].n)}</button>`).join('')}</div></div>`).join('')+'</div>';
+}
+function stateOf(id){
+  const c=COND[condKey];
+  if(S[id].k==='ileti'){
+    if(condKey==='avb3'&&id==='avn') return {t:'Bu durumda: bloklu, uyarı geçmiyor',cls:'state-block'};
+    if(condKey==='lbbb'&&id==='lbb') return {t:'Bu durumda: bloklu, uyarı geçmiyor',cls:'state-block'};
+    return c.off.includes(id)?{t:'Bu durumda: çalışmıyor (koyu sarı)',cls:'state-off'}:{t:'Bu durumda: çalışıyor (parlak sarı)',cls:'state-on'};
+  }
+  if(S[id].k==='sinir') return c.nerveOn.includes(id)?{t:'Bu durumda: baskın / aktif',cls:'state-on'}:{t:'Bu durumda: baskın değil',cls:'state-off'};
+  return null;
+}
+function condHTML(){
+  const c=COND[condKey];
+  let h=`<div><div class="eyebrow">Durum · ${esc(c.tag)}</div><h2>${esc(c.n)}</h2></div>
+  <div class="status"><span class="pill"><i id="pA"></i>Atriyumlar</span><span class="pill"><i id="pV"></i>Ventriküller</span></div>
+  <p>${esc(c.sum)}</p>
+  <dl class="facts">
+    <div><dt>EKG’de</dt><dd><ul class="ecgf">${c.ecg.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></dd></div>
+    <div><dt>Kaslar</dt><dd>${esc(c.mus)}</dd></div>
+    <div><dt>İleti yolları ve sinirler</dt><dd>${esc(c.ner)}</dd></div>
+    ${c.cli?`<div><dt>Klinik not</dt><dd>${esc(c.cli)}</dd></div>`:''}
+  </dl>`;
+  if(c.note) h+=`<div class="note"><b>Basitleştirme / tahmin</b>${esc(c.note)}</div>`;
+  if(selected) h+=structHTML(selected,true);
+  else h+=`<p class="latin" style="font-style:normal">İpucu: çizimde bir yapıya dokunarak bu durumdaki rolünü görebilirsin.</p>`;
+  return h;
+}
+function renderPanel(){
+  panel.innerHTML = mode==='anatomi' ? structHTML(selected,false)+indexHTML() : condHTML();
+  pA=document.getElementById('pA'); pV=document.getElementById('pV');
+}
+function applySelection(){
+  svg.querySelectorAll('.selected').forEach(e=>e.classList.remove('selected'));
+  if(selected){svg.querySelectorAll(`.sel-able[data-id="${selected}"]`).forEach(e=>e.classList.add('selected'));}
+  svg.classList.toggle('has-sel',!!selected);
+}
+function select(id){
+  if(mode==='durumlar' && id===selected) id=null;
+  selected=id; applySelection(); renderPanel();
+}
+panel.addEventListener('click',e=>{const b=e.target.closest('[data-pick]'); if(b) select(b.dataset.pick);});
+svg.addEventListener('click',e=>{const t=e.target.closest('[data-id]'); if(t) select(t.dataset.id); else if(mode==='durumlar') select(null);});
+
+// İpucu balonu
+const tip=document.getElementById('tip'), stage=svg.parentElement;
+svg.addEventListener('pointermove',e=>{
+  const t=e.target.closest('[data-id]');
+  if(!t||e.pointerType==='touch'){tip.hidden=true;return;}
+  const r=stage.getBoundingClientRect();
+  tip.textContent=S[t.dataset.id].n; tip.hidden=false;
+  tip.style.left=(e.clientX-r.left)+'px'; tip.style.top=(e.clientY-r.top)+'px';
+});
+svg.addEventListener('pointerleave',()=>tip.hidden=true);
+
+// Katman düğmeleri
+[['cond','hide-cond'],['nerves','hide-nerves'],['valves','hide-valves'],['vessels','hide-vessels'],['labels','hide-labels']].forEach(([k,cls])=>{
+  const cb=document.getElementById('ly-'+k); cb.addEventListener('change',()=>svg.classList.toggle(cls,!cb.checked));
+});
+
+/* ---------------- Simülasyon ---------------- */
+let pA=null,pV=null;
+const sim={t:0,speed:1,playing:true,atrial:[],vent:[],nextA:0,nextV:0,rng:null,fl0:0};
+function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function resetSim(){
+  sim.atrial=[];sim.vent=[];sim.rng=mulberry(7);
+  sim.nextA=sim.t+0.3; sim.nextV=sim.t+0.5; sim.fl0=sim.t;
+  generate(sim.t+2);
+}
+function generate(until){
+  const c=COND[condKey];
+  if(c.atrial==='sinus'){
+    while(sim.nextA<until){
+      const ta=sim.nextA, rr=60/c.rate*(1+(c.sv||0)*Math.sin(2*Math.PI*ta/4.2));
+      sim.atrial.push({t:ta,type:'sinus'});
+      if(c.conducts) sim.vent.push({t:ta+c.pr,rr,src:'sinus'});
+      sim.nextA+=rr;
+    }
+  } else if(c.atrial==='flutter'){
+    while(sim.nextA<until){
+      const k=Math.round((sim.nextA-sim.fl0)/0.2);
+      sim.atrial.push({t:sim.nextA,type:'F'});
+      if(k%2===0) sim.vent.push({t:sim.nextA+0.26,rr:0.4,src:'flutter'});
+      sim.nextA+=0.2;
+    }
+  }
+  if(c.vent==='af'){
+    while(sim.nextV<until){const rr=0.34+sim.rng()*0.48; sim.vent.push({t:sim.nextV,rr,src:'af'}); sim.nextV+=rr;}
+  } else if(c.vent==='escape'){
+    while(sim.nextV<until){const rr=60/c.esc; sim.vent.push({t:sim.nextV,rr,src:'escape'}); sim.nextV+=rr;}
+  }
+  const cut=sim.t-8; sim.atrial=sim.atrial.filter(a=>a.t>cut); sim.vent=sim.vent.filter(v=>v.t>cut);
+}
+
+// EKG modeli (mV)
+const g=(x,c,s,a)=>a*Math.exp(-((x-c)*(x-c))/(2*s*s));
+function qt(rr){return Math.min(0.48,Math.max(0.27,0.40*Math.sqrt(Math.min(rr,1.6))));}
+function beat(d,e,type){
+  const q=qt(e.rr);
+  if(type==='lbbb') return g(d,0.018,0.01,-0.03)+g(d,0.055,0.02,0.52)+g(d,0.112,0.022,0.66)+g(d,q-0.04,0.05,-0.2);
+  return g(d,0.012,0.008,-0.07)+g(d,0.04,0.0105,1.15)+g(d,0.066,0.01,-0.24)+g(d,q-0.09,0.042,0.3);
+}
+function ecgAt(t){
+  const c=COND[condKey]; let v=0;
+  for(const a of sim.atrial){ if(a.type!=='sinus')continue; const d=t-a.t; if(d>-0.05&&d<0.2) v+=g(d,0.05,0.021,0.14); }
+  for(const e of sim.vent){ const d=t-e.t; if(d>-0.05&&d<0.8) v+=beat(d,e,c.qrs); }
+  if(c.atrial==='af') v+=0.045*Math.sin(2*Math.PI*6.3*t)+0.03*Math.sin(2*Math.PI*8.7*t+1.7)+0.028*Math.sin(2*Math.PI*4.9*t+0.4)*Math.sin(2*Math.PI*0.6*t);
+  if(c.atrial==='flutter'){ const ph=(((t-sim.fl0)/0.2)%1+1)%1; v+= ph<0.72 ? 0.08-0.27*(ph/0.72) : -0.19+0.27*((ph-0.72)/0.28); }
+  return v+0.012*Math.sin(2*Math.PI*0.22*t);
+}
+
+// İleti zamanlamaları
+const bump=(x,d)=>(x>0&&x<d)?Math.sin(Math.PI*x/d):0;
+function activations(id){
+  const c=COND[condKey], out=[];
+  if(c.off.includes(id)) return out;
+  const atrialIds={sa:[-0.01,0.035],int:[0,0.045],bach:[0.005,0.05]};
+  if(atrialIds[id]){
+    for(const a of sim.atrial){
+      if(a.type==='sinus') out.push([a.t+atrialIds[id][0],atrialIds[id][1]]);
+      else if(a.type==='F'&&id==='bach') out.push([a.t+0.06,0.05]);
+    }
+    return out;
+  }
+  const vIds={avn:[-0.12,0.08],his:[-0.04,0.03],rbb:[-0.012,0.035],lbb:[-0.012,0.016],laf:[0.004,0.024],lpf:[0.004,0.024],purk:[0.012,0.055]};
+  if(vIds[id]){
+    for(const e of sim.vent){
+      if(id==='avn'&&e.src==='escape') continue;
+      let o=vIds[id][0], d=vIds[id][1];
+      if(id==='avn'&&e.src==='af'){o=-0.1;d=0.06;}
+      if(id==='avn'&&e.src==='flutter'){o=-0.14;d=0.1;}
+      if(id==='purk'&&c.qrs==='lbbb'){d=0.11;}
+      out.push([e.t+o,d]);
+    }
+  }
+  return out;
+}
+
+const atriaG=document.getElementById('atria'), ventG=document.getElementById('ventricles');
+const condA=document.getElementById('cond-atrial'), condV=document.getElementById('cond-vent');
+const special=document.getElementById('special'), afWaves=document.getElementById('afWaves'), flDots=document.getElementById('flDots'), flLoop=document.getElementById('flLoop');
+const walls={ra:[],la:[],ias:[],rv:[],lv:[],ivs:[],pap:[],mod:[]};
+svg.querySelectorAll('.wall').forEach(w=>{if(walls[w.dataset.id])walls[w.dataset.id].push(w);});
+const nerveEls=[...svg.querySelectorAll('.nerve,.ganglion')];
+const hex=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+const css=getComputedStyle(document.documentElement);
+const C_M=hex(css.getPropertyValue('--muscle').trim()), C_H=hex(css.getPropertyValue('--muscle-hi').trim()), C_AF=hex(css.getPropertyValue('--af').trim());
+const mix=(a,b,k)=>`rgb(${a.map((v,i)=>Math.round(v+(b[i]-v)*k)).join(',')})`;
+for(let i=0;i<6;i++) mk('circle',{r:5-i*0.6,fill:'var(--pulse)',opacity:1-i*0.15,filter:'url(#glow)'},flDots);
+const afPaths=[]; for(let i=0;i<9;i++) afPaths.push(mk('path',{class:'afw'},afWaves));
+const pvSparks=[mk('circle',{cx:494,cy:184,r:4,fill:'var(--pulse)',filter:'url(#glow)'},afWaves),mk('circle',{cx:494,cy:252,r:4,fill:'var(--pulse)',filter:'url(#glow)'},afWaves)];
+let afNext=0;
+
+function applyCondStatic(){
+  const c=COND[condKey];
+  condEls.forEach(el=>el.classList.toggle('dim', mode==='durumlar' && c.off.includes(el.dataset.id)));
+  nerveEls.forEach(el=>el.classList.toggle('dim', mode==='durumlar' && !c.nerveOn.includes(el.dataset.id)));
+  special.hidden = mode!=='durumlar';
+  document.getElementById('blockAV').hidden = condKey!=='avb3';
+  document.getElementById('blockLBB').hidden = condKey!=='lbbb';
+  flLoop.style.display = condKey==='flutter'?'':'none'; flDots.style.display = condKey==='flutter'?'':'none';
+  afWaves.style.display = condKey==='af'?'':'none';
+  document.getElementById('lgAf').hidden = condKey!=='af'||mode!=='durumlar';
+  const dl=document.getElementById('readDl');
+  dl.innerHTML=Object.entries(c.read).map(([k,v])=>`<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')+`<dt>Atriyum</dt><dd>${c.atrial==='af'?'~350–600/dk, kaotik':c.atrial==='flutter'?'~300/dk':c.rate+'/dk'}</dd>`;
+}
+function resetVisuals(){
+  [atriaG,condA,ventG,condV].forEach(gp=>gp.removeAttribute('transform'));
+  Object.values(walls).flat().forEach(w=>w.style.fill='');
+  condEls.forEach(el=>{el._pulse.style.opacity=0;});
+  nerveEls.forEach(el=>el.style.strokeDashoffset='');
+  setLeaves(0.45);
+}
+
+function updateHeart(){
+  const t=sim.t, c=COND[condKey];
+  // kasılma değerleri
+  let ca=0,cv=0,cvL=0,sysAV=0;
+  for(const a of sim.atrial){
+    if(a.type==='sinus') ca=Math.max(ca,bump(t-a.t-0.06,0.15));
+    else ca=Math.max(ca,0.35*bump(t-a.t-0.03,0.14));
+  }
+  for(const e of sim.vent){
+    const sys=Math.min(0.36,0.32*Math.sqrt(e.rr));
+    const fill=e.src==='af'?Math.min(1,0.55+(e.rr-0.34)/0.6):1;
+    cv=Math.max(cv,fill*bump(t-e.t-0.03,sys));
+    cvL=Math.max(cvL,fill*bump(t-e.t-0.03-(c.lvDelay||0),sys));
+    const x=t-e.t; if(x>-0.01&&x<sys+0.04) sysAV=Math.max(sysAV, Math.min(1,(x+0.01)/0.03, (sys+0.04-x)/0.05));
+  }
+  let qx=0,qy=0,afk=0;
+  if(c.atrial==='af'){qx=0.006*(Math.sin(t*41)+Math.sin(t*67+1.3));qy=0.006*(Math.sin(t*53+0.7)+Math.sin(t*79+2.1));afk=0.45+0.35*Math.abs(Math.sin(t*23)*Math.sin(t*31+1));}
+  const ta=`translate(296 232) scale(${(1-0.05*ca+qx).toFixed(4)} ${(1-0.065*ca+qy).toFixed(4)}) translate(-296 -232)`;
+  const cvm=Math.max(cv,cvL);
+  const tv=`translate(310 420) scale(${(1-0.045*cvm).toFixed(4)} ${(1-0.075*cvm).toFixed(4)}) translate(-310 -420)`;
+  atriaG.setAttribute('transform',ta); condA.setAttribute('transform',ta);
+  ventG.setAttribute('transform',tv); condV.setAttribute('transform',tv);
+  setLeaves(1-sysAV);
+  // kas renkleri
+  const aCol = c.atrial==='af' ? mix(C_M,C_AF,afk) : mix(C_M,C_H,ca);
+  ['ra','la','ias'].forEach(k=>walls[k].forEach(w=>w.style.fill=aCol));
+  const rCol=mix(C_M,C_H,cv), lCol=mix(C_M,C_H,cvL);
+  ['rv','mod'].forEach(k=>walls[k].forEach(w=>w.style.fill=rCol));
+  ['lv','ivs'].forEach(k=>walls[k].forEach(w=>w.style.fill=(k==='ivs'&&c.lvDelay)?mix(C_M,C_H,Math.max(cv*0.6,cvL)):lCol));
+  walls.pap.forEach((w,i)=>w.style.fill=i===0?rCol:lCol);
+  if(pA) pA.style.background = c.atrial==='af' ? mix(C_M,C_AF,afk) : (ca>0.05?mix(C_M,C_H,ca):'');
+  if(pV) pV.style.background = cvm>0.05?mix(C_M,C_H,cvm):'';
+  // ileti nabızları
+  const cache={};
+  condEls.forEach(el=>{
+    const id=el.dataset.id; const acts=cache[id]||(cache[id]=activations(id));
+    let best=null; for(const a of acts){ if(a[0]<=t && (!best||a[0]>best[0])) best=a; }
+    const p=el._pulse;
+    if(!best){p.style.opacity=0;return;}
+    const x=(t-best[0])/best[1];
+    if(x<1){ p.style.opacity=1; if(el._len) p.style.strokeDasharray=`${(el._len*x).toFixed(1)} ${el._len}`; }
+    else { const f=1-(t-best[0]-best[1])/0.22; p.style.opacity=Math.max(0,f).toFixed(3); if(el._len) p.style.strokeDasharray=`${el._len} 0`; }
+  });
+  // sinir akışı
+  nerveEls.forEach(el=>{ if(el.classList.contains('nerve')) el.style.strokeDashoffset = c.nerveOn.includes(el.dataset.id)?(-t*30).toFixed(1):'0'; });
+  // flutter devresi
+  if(condKey==='flutter'){
+    const th=2*Math.PI*((t-sim.fl0)/0.2);
+    [...flDots.children].forEach((d,i)=>{const a=th-i*0.22; d.setAttribute('cx',(184+52*Math.cos(a)).toFixed(1)); d.setAttribute('cy',(282-26*Math.sin(a)).toFixed(1));});
+  }
+  // AF dalgacıkları
+  if(condKey==='af' && t>=afNext){
+    afNext=t+0.09;
+    afPaths.forEach((p,i)=>{
+      const left=i<5; const bx=left?[132,240]:[318,466], by=left?[168,300]:[168,296];
+      let x=bx[0]+Math.random()*(bx[1]-bx[0]), y=by[0]+Math.random()*(by[1]-by[0]);
+      let d=`M${x.toFixed(0)} ${y.toFixed(0)}`;
+      for(let k=0;k<2;k++){const cx=x+(Math.random()-0.5)*44, cy=y+(Math.random()-0.5)*44; x+= (Math.random()-0.5)*40; y+=(Math.random()-0.5)*40; d+=` Q${cx.toFixed(0)} ${cy.toFixed(0)} ${x.toFixed(0)} ${y.toFixed(0)}`;}
+      p.setAttribute('d',d); p.style.opacity=(0.35+Math.random()*0.65).toFixed(2);
+    });
+    pvSparks.forEach(s=>s.style.opacity=Math.random()<0.3?1:0.1);
+  }
+}
+
+// EKG çizimi
+const cv=document.getElementById('ecg'), ctx=cv.getContext('2d');
+const ECG_COL=css.getPropertyValue('--ecg').trim(), GRID=css.getPropertyValue('--grid').trim(), GRID2=css.getPropertyValue('--grid-strong').trim(), MUTED=css.getPropertyValue('--muted').trim();
+function sizeCanvas(){const r=cv.getBoundingClientRect(), dpr=Math.min(2,window.devicePixelRatio||1); cv.width=Math.max(1,Math.round(r.width*dpr)); cv.height=Math.round(r.height*dpr); ctx.setTransform(dpr,0,0,dpr,0,0);}
+window.addEventListener('resize',sizeCanvas);
+function drawECG(){
+  const W=cv.clientWidth, H=cv.clientHeight; if(!W) return;
+  const win=W<620?3:5, pps=W/win, ppmv=pps*0.4, base=H*0.64, t0=sim.t-win;
+  ctx.fillStyle='#050b0a'; ctx.fillRect(0,0,W,H);
+  ctx.lineWidth=1;
+  for(let k=Math.ceil(t0/0.04);k*0.04<=sim.t;k++){const x=(k*0.04-t0)*pps; ctx.strokeStyle=(k%5===0)?GRID2:GRID; ctx.beginPath(); ctx.moveTo(x+0.5,0); ctx.lineTo(x+0.5,H); ctx.stroke();}
+  for(let k=-Math.floor(base/(ppmv*0.1));k*ppmv*0.1<=H-base;k++){const y=base+k*ppmv*0.1; ctx.strokeStyle=(k%5===0)?GRID2:GRID; ctx.beginPath(); ctx.moveTo(0,y+0.5); ctx.lineTo(W,y+0.5); ctx.stroke();}
+  ctx.strokeStyle=ECG_COL; ctx.lineWidth=2; ctx.lineJoin='round'; ctx.shadowColor=ECG_COL; ctx.shadowBlur=6;
+  ctx.beginPath();
+  for(let x=0;x<=W;x+=1){const y=base-ecgAt(t0+x/pps)*ppmv; x?ctx.lineTo(x,y):ctx.moveTo(x,y);}
+  ctx.stroke(); ctx.shadowBlur=0;
+  const yEnd=base-ecgAt(sim.t)*ppmv; ctx.fillStyle=ECG_COL; ctx.beginPath(); ctx.arc(W-2,yEnd,3,0,7); ctx.fill();
+  // dalga etiketleri (son tamamlanmış atım)
+  const c=COND[condKey]; ctx.font='11px "IBM Plex Mono", monospace'; ctx.fillStyle=MUTED; ctx.textAlign='center';
+  const done=sim.vent.filter(e=>e.t+0.55<sim.t && e.t>t0+0.25); const e=done[done.length-1];
+  const X=tt=>(tt-t0)*pps;
+  if(e){
+    ctx.fillText(c.qrs==='lbbb'?'QRS (geniş)':'QRS',X(e.t+(c.qrs==='lbbb'?0.085:0.04)),base-ppmv*(c.qrs==='lbbb'?0.9:1.25));
+    const q=qt(e.rr); ctx.fillText('T',X(e.t+q-(c.qrs==='lbbb'?0.04:0.09)),c.qrs==='lbbb'?base+ppmv*0.42:base-ppmv*0.5);
+    if(c.atrial==='sinus' && c.conducts){const a=sim.atrial.filter(a=>a.t<e.t).pop(); if(a&&X(a.t)>10) ctx.fillText('P',X(a.t+0.05),base-ppmv*0.34);}
+  }
+  if(c.atrial==='sinus' && !c.conducts){ sim.atrial.filter(a=>a.t>t0+0.1&&a.t+0.15<sim.t).forEach(a=>ctx.fillText('P',X(a.t+0.05),base+ppmv*0.42)); }
+  if(c.atrial==='af') ctx.fillText('f dalgaları',W*0.5,base+ppmv*0.42);
+  if(c.atrial==='flutter') ctx.fillText('F  F  F (testere dişi)',W*0.5,base+ppmv*0.48);
+}
+function updateReadout(){
+  const past=sim.vent.filter(e=>e.t<=sim.t).slice(-6);
+  let hr='--'; if(past.length>=2){const avg=(past[past.length-1].t-past[0].t)/(past.length-1); hr=Math.round(60/avg);}
+  document.getElementById('hrv').textContent=hr;
+}
+
+let last=0, rafId=0, hrTick=0;
+const reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function frame(ts){
+  rafId=requestAnimationFrame(frame);
+  const dt=last?Math.min(0.05,(ts-last)/1000):0; last=ts;
+  if(sim.playing) sim.t+=dt*sim.speed;
+  generate(sim.t+2);
+  updateHeart(); drawECG();
+  if(ts-hrTick>500){hrTick=ts;updateReadout();}
+}
+function startLoop(){ if(!rafId){last=0;rafId=requestAnimationFrame(frame);} }
+function stopLoop(){ cancelAnimationFrame(rafId); rafId=0; }
+
+/* ---------------- Kontroller ---------------- */
+const condBar=document.getElementById('condBar');
+condBar.innerHTML=Object.entries(COND).map(([k,c])=>`<button type="button" data-cond="${k}" aria-pressed="${k===condKey}">${esc(c.n)}</button>`).join('');
+condBar.addEventListener('click',e=>{const b=e.target.closest('[data-cond]'); if(!b)return; condKey=b.dataset.cond;
+  condBar.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b)); resetSim(); applyCondStatic(); renderPanel();});
+const btnPlay=document.getElementById('btnPlay');
+btnPlay.addEventListener('click',()=>{sim.playing=!sim.playing; btnPlay.textContent=sim.playing?'Duraklat':'Oynat';});
+document.querySelectorAll('[data-speed]').forEach(b=>b.addEventListener('click',()=>{sim.speed=+b.dataset.speed; document.querySelectorAll('[data-speed]').forEach(x=>x.setAttribute('aria-pressed',x===b));}));
+
+function setMode(m){
+  mode=m;
+  document.getElementById('tab-anatomi').toggleAttribute('aria-current',m==='anatomi'); if(m==='anatomi')document.getElementById('tab-anatomi').setAttribute('aria-current','page');
+  document.getElementById('tab-durumlar').toggleAttribute('aria-current',m==='durumlar'); if(m==='durumlar')document.getElementById('tab-durumlar').setAttribute('aria-current','page');
+  const sim_=m==='durumlar';
+  condBar.hidden=!sim_; document.getElementById('simCtrl').hidden=!sim_; document.getElementById('monitor').hidden=!sim_;
+  if(sim_){ if(selected && !['ileti','sinir'].includes(S[selected].k)) selected=null; if(reduce&&sim.playing){sim.playing=false;btnPlay.textContent='Oynat';} applySelection(); resetSim(); applyCondStatic(); renderPanel(); sizeCanvas(); startLoop(); }
+  else { stopLoop(); resetVisuals(); if(!selected) selected='sa'; applyCondStatic(); applySelection(); renderPanel(); }
+}
+function route(){ setMode(location.hash==='#durumlar'?'durumlar':'anatomi'); }
+window.addEventListener('hashchange',route);
+route();
+})();
+</script>

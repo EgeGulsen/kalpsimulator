@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kalp Simülatörü</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Gerçek bir insan kalbi modelinde odacıkları, koroner dalları, venleri, ileti sistemini ve sinirleri tek tek incele; ritim bozukluklarını ve klinik durumları EKG ile izle.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Space+Grotesk:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="stage" id="stage" aria-label="3D kalp modeli. Sürükleyerek döndür, kaydırarak yakınlaştır, tıklayarak bir yapıyı seç.">
+  <div class="loading" id="loading"><span class="spin" aria-hidden="true"></span>3D kalp yükleniyor…</div>
+  <div class="labels" id="labels"></div>
+  <div class="tip" id="tip" hidden></div>
+</div>
+
+<header class="top">
+  <div class="brand"><i aria-hidden="true"></i>Kalp Simülatörü</div>
+  <nav class="tabs" aria-label="Bölüm">
+    <a href="#anatomi" id="tab-anatomi">Anatomi</a>
+    <a href="#durumlar" id="tab-durumlar">Durumlar</a>
+    <a href="#ogren" id="tab-ogren">Öğren</a>
+  </nav>
+  <button class="iconbtn" id="btnAbout" type="button" aria-label="Hakkında ve kaynaklar">i</button>
+</header>
+
+<section class="monitor" id="monitor" aria-label="Örnek EKG">
+  <div class="hrbox">
+    <div class="eyebrow" id="monName">EKG</div>
+    <div class="hr"><span id="hrv">--</span><small>/dk</small></div>
+    <div class="simctl" id="simCtrl">
+      <button class="mbtn" id="btnPlay" type="button">Duraklat</button>
+      <span class="spd"><button class="mbtn" type="button" data-speed="0.25">¼×</button><button class="mbtn" type="button" data-speed="0.5">½×</button><button class="mbtn" type="button" data-speed="1" aria-pressed="true">1×</button></span>
+    </div>
+  </div>
+  <div class="cv">
+    <canvas id="ecg" aria-label="Kayan örnek EKG"></canvas>
+    <div class="mlabel" id="lead">DII</div>
+    <div class="mlabel2">25 mm/sn · 10 mm/mV · sentetik örnek</div>
+  </div>
+</section>
+
+<section class="ecg12" id="ecg12" aria-label="12 derivasyonlu öğretici EKG">
+  <div class="e12h">
+    <div class="e12t"><span class="eyebrow">12 derivasyon</span><b id="e12sel">DII</b><span id="e12info"></span></div>
+    <div class="e12c">
+      <span class="seg" id="e12var"></span>
+      <button class="mbtn" id="btnEye" type="button">Bu derivasyonun gözünden bak</button>
+      <span class="spd"><button class="mbtn" type="button" data-speed="0.25">¼×</button><button class="mbtn" type="button" data-speed="0.5">½×</button><button class="mbtn" type="button" data-speed="1" aria-pressed="true">1×</button></span>
+    </div>
+  </div>
+  <canvas id="ecg12c" aria-label="12 derivasyonlu EKG. Bir derivasyonu seçmek için tıkla."></canvas>
+</section>
+
+<aside class="panel nav" id="nav" aria-label="Liste"></aside>
+<aside class="panel nav parts" id="parts" aria-label="Parçaları incele" hidden></aside>
+
+<aside class="panel card" id="card" aria-live="polite"></aside>
+
+<div class="toolbar" id="toolbar">
+  <label class="tog"><input type="checkbox" id="t-xray"><span class="dot"></span>İçini göster</label>
+  <label class="tog"><input type="checkbox" id="t-labels"><span class="dot"></span>İsimler</label>
+  <label class="tog"><input type="checkbox" id="t-cond" checked><span class="dot"></span>İleti</label>
+  <label class="tog"><input type="checkbox" id="t-nerves" checked><span class="dot"></span>Sinirler</label>
+  <label class="tog"><input type="checkbox" id="t-vessels" checked><span class="dot"></span>Damarlar</label>
+  <button class="tog tbtn" id="btnParts" type="button" aria-pressed="false"><span class="dot"></span>Parçalar</button>
+  <button class="btn" id="btnReset" type="button" title="Görünümü sıfırla" aria-label="Görünümü sıfırla">↺</button>
+</div>
+
+<dialog class="about" id="about">
+  <h2>Hakkında</h2>
+  <p><b>Tıbbi tavsiye değildir.</b> Bu site eğitim amaçlıdır. Uyarı yayılımı, ileti sisteminin ve sinirlerin modeldeki yeri, alt bölgelerin sınırları ve EKG çizgileri yaklaşık örneklerdir.</p>
+  <p>3D kalp modeli: <a href="https://lifesciencedb.jp/bp3d/" target="_blank" rel="noopener">BodyParts3D</a>, © 2008 Life Science Integrated Database Center, <a href="https://creativecommons.org/licenses/by-sa/2.1/jp/" target="_blank" rel="noopener">CC BY-SA 2.1 JP</a> lisansıyla; sadeleştirilip bölümlere ayrıldı.</p>
+  <h3>Kaynaklar</h3>
+  <ul id="srcList"></ul>
+  <form method="dialog"><button class="btn">Kapat</button></form>
+</dialog>
+
+<footer class="foot"><b>Tıbbi tavsiye değildir.</b> Eğitim amaçlı, yaklaşık bir model. 3D model: BodyParts3D, © 2008 LSIDC, CC BY-SA 2.1 JP.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="js/content.js"></script>
+<script src="js/scenarios.js"></script>
+<script src="js/lessons.js"></script>
+<script src="js/ecg12.js"></script>
+<script src="js/sim.js"></script>
+<script src="js/heart3d.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

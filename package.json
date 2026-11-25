@@ -1,0 +1,15 @@
+{
+  "name": "kalp-simulatoru",
+  "version": "5.0.0",
+  "private": true,
+  "description": "Gerçek bir insan kalbi modeliyle anatomi, ritim bozuklukları ve 12 derivasyonlu EKG öğreten eğitim sitesi",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --open",
+    "build": "vite build && node tools/copy-static.mjs",
+    "preview": "vite preview --open"
+  },
+  "devDependencies": {
+    "vite": "^6.4.6"
+  }
+}
