@@ -843,44 +843,175 @@ function create(el,opts){
 
 
   /* =====================================================================
-     Gövde (yalnız senaryolarda): omuzdan bele saydam deri, kaburgalar, sternum
-     Ölçek: 1 birim ≈ 5 cm. +x hastanın solu, +y yukarı, +z ön.
+     Gövde (yalnız senaryolarda): deri, göğüs kafesi, omurga, akciğerler, diyafram
+     Kalp sabit (orijinde); gövde onun çevresine anatomik olarak yerleşir:
+     orta hat kalbin sağında (kalbin ~2/3'ü solda), sternum hemen önünde,
+     tepe 5. aralık / midklaviküler hatta, alt yüz diyaframın santral tendonunda.
+     Ölçek: 1 birim ≈ 4–5 cm. +x hastanın solu, +y yukarı, +z ön.
      ===================================================================== */
-  const TOR={cx:-0.35,cz:-0.55};
-  // y, yarı genişlik, yarı derinlik, kesit köşeliliği
-  const PROF=[[-4.6,2.4,1.72,2.2],[-3.7,2.32,1.75,2.2],[-2.4,2.6,2.0,2.3],[-0.8,2.9,2.25,2.4],[0.8,3.05,2.3,2.5],[2.0,3.45,2.1,2.8],[2.8,3.7,1.75,3.0],[3.3,3.3,1.45,2.8],[3.75,2.0,1.1,2.3],[4.05,1.0,0.95,2.0],[5.0,0.85,0.85,2.0]];
-  function prof(y){
-    const P=PROF; if(y<=P[0][0]) return P[0].slice(1); if(y>=P[P.length-1][0]) return P[P.length-1].slice(1);
+  const TOR={cx:-0.6,cz:-0.6};
+  // [y, yarı genişlik, yarı derinlik, kesit köşeliliği, ön-arka kayma]
+  const SKIN=[[-5.8,3.3,2.15,2.3,0.12],[-4.4,3.25,2.2,2.3,0.08],[-3.0,3.45,2.35,2.4,0.02],[-1.6,3.62,2.5,2.5,0],[-0.2,3.72,2.55,2.6,0],[1.0,3.78,2.55,2.7,0],[1.9,3.98,2.45,2.9,-0.02],[2.5,4.45,2.2,3.1,-0.08],[3.0,4.5,1.95,3.0,-0.16],[3.4,3.95,1.75,2.7,-0.25],[3.75,2.7,1.5,2.3,-0.45],[4.1,1.55,1.42,2.1,-0.58],[4.6,1.38,1.42,2.0,-0.58],[5.9,1.38,1.42,2.0,-0.52]];
+  const CAGE=[[-3.6,2.95,1.95,2.3,0.05],[-2.6,3.15,2.05,2.3,0.02],[-1.6,3.28,2.15,2.4,0],[-0.6,3.3,2.2,2.4,0],[0.5,3.2,2.2,2.4,0],[1.5,2.95,2.08,2.3,-0.04],[2.4,2.5,1.8,2.2,-0.1],[3.1,1.85,1.45,2.1,-0.18],[3.7,1.2,1.15,2.0,-0.25],[4.2,0.9,0.95,2.0,-0.3]];
+  function profAt(P,y){
+    if(y<=P[0][0]) return P[0].slice(1); if(y>=P[P.length-1][0]) return P[P.length-1].slice(1);
     let i=0; while(P[i+1][0]<y) i++;
     const a=P[Math.max(0,i-1)],b=P[i],c=P[i+1],d=P[Math.min(P.length-1,i+2)], t=(y-b[0])/(c[0]-b[0]);
     const cr=(k)=>{const p0=a[k],p1=b[k],p2=c[k],p3=d[k],t2=t*t,t3=t2*t; return 0.5*((2*p1)+(-p0+p2)*t+(2*p0-5*p1+4*p2-p3)*t2+(-p0+3*p1-3*p2+p3)*t3);};
-    return [cr(1),cr(2),cr(3)];
+    return [cr(1),cr(2),cr(3),cr(4)];
   }
-  function surf(y,a,k){ // a: önden açı (sağ < 0 < sol), k: yüzeye göre ölçek
-    const [rx,rz,e]=prof(y), s=Math.sin(a), c=Math.cos(a), q=2/e;
-    const x=TOR.cx+(k||1)*rx*Math.sign(s)*Math.pow(Math.abs(s),q), z=TOR.cz+(k||1)*rz*Math.sign(c)*Math.pow(Math.abs(c),q);
-    return V(x,y,z);
+  function shell(P,y,a,k){ // a: önden açı (sağ < 0 < sol), k: kesite göre ölçek
+    const [rx,rz,e,dz]=profAt(P,y), s=Math.sin(a), c=Math.cos(a), q=2/e; k=k||1;
+    return V(TOR.cx+k*rx*Math.sign(s)*Math.pow(Math.abs(s),q), y, TOR.cz+dz+k*rz*Math.sign(c)*Math.pow(Math.abs(c),q));
+  }
+  const surf=(y,a,k)=>shell(SKIN,y,a,k), cage=(y,a,k)=>shell(CAGE,y,a,k);
+  // kesitin (x,z) yönündeki yarıçapı: süperelips
+  function wallR(P,y,dx,dz){ const [rx,rz,e]=profAt(P,y), L=Math.hypot(dx,dz)||1, cs=Math.abs(dx)/L, sn=Math.abs(dz)/L; return 1/Math.pow(Math.pow(cs/rx,e)+Math.pow(sn/rz,e),1/e); }
+  function clampIn(P,p,k){ const dz0=profAt(P,p.y)[3], dx=p.x-TOR.cx, dz=p.z-(TOR.cz+dz0), L=Math.hypot(dx,dz), R=k*wallR(P,p.y,dx,dz); if(L>R){ p.x=TOR.cx+dx*R/L; p.z=TOR.cz+dz0+dz*R/L; } return p; }
+  const G2=(a,b,s)=>Math.exp(-(a*a+b*b)/(2*s*s));
+  // diyafram yüksekliği: sağ kubbe yüksek, sol kubbe arka-yanda, kalp santral tendonda
+  function dia(x,z){
+    const u=(x-TOR.cx)/3.2, w=(z-TOR.cz)/2.1, rho=Math.min(1,Math.hypot(u,w));
+    const top=-1.4+0.85*G2(u+0.6,w,0.24)+0.45*G2(u-0.72,w+0.35,0.2);
+    const rim=-2.45+1.05*w, t=Math.pow(rho,4);
+    return top*(1-t)+rim*t;
+  }
+  // deri kabartıları (pektoral, sternal oluk, juguler çentik, klavikula, göbek, omurga oluğu, skapula)
+  function skinDisp(y,ux,uz){
+    const g=(v,s)=>Math.exp(-v*v/(2*s*s)), fr=Math.max(0,uz), bk=Math.max(0,-uz), ax=Math.abs(ux);
+    const ss=(a,b,v)=>{const t=Math.min(1,Math.max(0,(v-a)/(b-a))); return t*t*(3-2*t);};
+    let d=0;
+    for(const sg of [-1,1]){ const dy=y-1.3; d+=0.2*fr*g(ux-sg*0.42,0.2)*g(dy,dy>0?0.75:0.4); }
+    d-=0.07*fr*g(ux,0.06)*ss(-1.4,-0.9,y)*(1-ss(2.6,3.0,y));
+    d-=0.22*fr*g(ux,0.09)*g(y-3.28,0.2);
+    d+=0.09*fr*g(y-(3.2+0.1*ax),0.1)*ss(0.06,0.14,ax)*(1-ss(0.75,0.9,ax));
+    d-=0.05*fr*g(ux,0.05)*(1-ss(-1.8,-1.3,y));
+    d-=0.16*fr*g(ux,0.04)*g(y+4.35,0.1);
+    d-=0.16*bk*g(ux,0.09)*(1-ss(4.0,4.6,y));
+    for(const sg of [-1,1]) d+=0.13*bk*g(ux-sg*0.42,0.17)*g(y-1.7,0.8);
+    return d;
+  }
+  function skinPt(y,a,out){ // derinin gerçek (kabartılı) yüzeyi; out: dışa ek mesafe
+    const [rx,rz,e,dz]=profAt(SKIN,y), p=surf(y,a,1), cx=TOR.cx, cz=TOR.cz+dz;
+    const ux=(p.x-cx)/rx, uz=(p.z-cz)/rz, n=V(p.x-cx,0,p.z-cz).normalize();
+    return p.addScaledVector(n,skinDisp(y,ux,uz)+(out||0));
+  }
+  function ghost(col,a0,a1,o){ // saydam, kenarı parlayan, hafif ışıklı malzeme
+    o=o||{};
+    return new T.ShaderMaterial({transparent:true,depthWrite:false,side:o.side===undefined?T.DoubleSide:o.side,
+      uniforms:{uC:{value:new T.Color(col)},uR:{value:new T.Color(o.rim||0xffffff)},uA:{value:1},uA0:{value:a0},uA1:{value:a1},uY0:{value:o.y0===undefined?-99:o.y0},uY1:{value:o.y1===undefined?99:o.y1},
+        uN1:{value:o.n1||V(0,-99,0)},uN2:{value:o.n2||V(0,-99,0)},uNC:{value:new T.Color(0xa8645a)}},
+      vertexShader:'varying vec3 vN;varying vec3 vV;varying vec3 vP;void main(){vec4 mv=modelViewMatrix*vec4(position,1.);vN=normalize(normalMatrix*normal);vV=-mv.xyz;vP=position;gl_Position=projectionMatrix*mv;}',
+      fragmentShader:'uniform vec3 uC;uniform vec3 uR;uniform vec3 uNC;uniform vec3 uN1;uniform vec3 uN2;uniform float uA;uniform float uA0;uniform float uA1;uniform float uY0;uniform float uY1;varying vec3 vN;varying vec3 vV;varying vec3 vP;'+
+        'void main(){vec3 n=normalize(vN);if(!gl_FrontFacing)n=-n;vec3 v=normalize(vV);float f=pow(1.-abs(dot(n,v)),2.2);'+
+        'float dif=0.62+0.38*max(dot(n,normalize(vec3(-0.35,0.65,0.68))),0.);'+
+        'float fade=smoothstep(uY0,uY0+1.2,vP.y)*(1.-smoothstep(uY1-1.0,uY1,vP.y));'+
+        'float nip=max(1.-smoothstep(0.16,0.3,distance(vP,uN1)),1.-smoothstep(0.16,0.3,distance(vP,uN2)));'+
+        'vec3 c=mix(uC*dif,uR,f*0.55);c=mix(c,uNC,nip*0.6);'+
+        'gl_FragColor=vec4(c,(uA0+uA1*f+0.1*nip)*fade*uA);}'});
   }
   const torsoG=new T.Group(); torsoG.visible=false; BODY.add(torsoG);
   (function buildTorso(){
-    const NY=70, NA=64, y0=-4.6, y1=5.0, pos=[], idx=[];
-    for(let j=0;j<=NY;j++){ const y=y0+(y1-y0)*j/NY; for(let i=0;i<=NA;i++){ const p=surf(y,-Math.PI+2*Math.PI*i/NA); pos.push(p.x,p.y,p.z); } }
+    const add=(geo,mat,ro)=>{ const m=new T.Mesh(geo,mat); m.renderOrder=ro; torsoG.add(m); return m; };
+    // ---- deri
+    const NY=96, NA=80, y0=-5.8, y1=5.9, pos=[], idx=[];
+    for(let j=0;j<=NY;j++){ const y=y0+(y1-y0)*j/NY; for(let i=0;i<=NA;i++){ const p=skinPt(y,-Math.PI+2*Math.PI*i/NA); pos.push(p.x,p.y,p.z); } }
     for(let j=0;j<NY;j++) for(let i=0;i<NA;i++){ const a=j*(NA+1)+i,b=a+NA+1; idx.push(a,b,a+1,b,b+1,a+1); }
     const g=new T.BufferGeometry(); g.setAttribute('position',new T.Float32BufferAttribute(pos,3)); g.setIndex(idx); g.computeVertexNormals();
-    const skin=new T.ShaderMaterial({transparent:true,depthWrite:false,side:T.DoubleSide,
-      uniforms:{uC:{value:new T.Color(0xf0b9a0)},uR:{value:new T.Color(0xffd9c4)},uA:{value:1},uY0:{value:y0},uY1:{value:y1}},
-      vertexShader:'varying vec3 vN;varying vec3 vV;varying float vY;void main(){vec4 mv=modelViewMatrix*vec4(position,1.);vN=normalize(normalMatrix*normal);vV=-mv.xyz;vY=position.y;gl_Position=projectionMatrix*mv;}',
-      fragmentShader:'uniform vec3 uC;uniform vec3 uR;uniform float uA;uniform float uY0;uniform float uY1;varying vec3 vN;varying vec3 vV;varying float vY;void main(){float f=pow(1.-abs(dot(normalize(vN),normalize(vV))),2.4);float fade=smoothstep(uY0,uY0+1.2,vY)*(1.-smoothstep(uY1-0.9,uY1,vY));gl_FragColor=vec4(mix(uC,uR,f),(0.035+0.42*f)*fade*uA);}'});
-    const m=new T.Mesh(g,skin); m.renderOrder=20; torsoG.add(m); torsoG.userData.skin=skin;
-    const bone=new T.MeshBasicMaterial({color:0xf2e8d8,transparent:true,opacity:0.13,depthWrite:false});
-    const tube=(pts,r)=>{const t=new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts),40,r,6,false),bone); t.renderOrder=19; torsoG.add(t);};
-    // kaburgalar: arkada omurgadan başlayıp öne doğru inerek sternuma yaklaşır
-    for(let r=0;r<10;r++){ const yb=2.75-r*0.56; for(const sg of [-1,1]){ const pts=[]; for(let k=0;k<=14;k++){ const u=k/14, a=sg*(Math.PI-0.22-(Math.PI-0.22-(r<7?0.32:0.75))*u), y=yb-1.0*u*u; pts.push(surf(y,a,0.9)); } tube(pts,0.045); } }
-    const st=surf(1.0,0,0.93); const sternum=new T.Mesh(new T.BoxGeometry(0.42,3.3,0.1),bone); sternum.position.set(st.x,1.0,st.z); sternum.renderOrder=19; torsoG.add(sternum);
-    for(const sg of [-1,1]) tube([surf(2.75,sg*0.12,0.95),surf(2.95,sg*0.75,0.95),surf(3.15,sg*1.25,0.95)],0.055); // köprücük kemikleri
-    const sp=[]; for(let k=0;k<=10;k++){ const y=-4.4+k*0.8; sp.push(surf(y,Math.PI,0.82)); } tube(sp,0.11);  // omurga
+    const nipY=0.85, nip=(sg)=>{ for(let a=0.3;a<1.4;a+=0.005){ const p=surf(nipY,sg*a,1); if(Math.abs(p.x-(TOR.cx+sg*2.05))<0.03) return skinPt(nipY,sg*a); } return V(0,-99,0); };
+    const skin=ghost(0xe9b49c,0.05,0.5,{rim:0xffe2cf,y0:y0,y1:y1,n1:nip(-1),n2:nip(1)});
+    add(g,skin,20); torsoG.userData.skin=skin;
+    // ---- iskelet
+    const bone=ghost(0xf3e7d2,0.1,0.5,{rim:0xffffff}), vert=ghost(0xf3e7d2,0.035,0.38,{rim:0xffffff,y1:5.6}), cart=ghost(0xbfd6df,0.08,0.45,{rim:0xeaf6fb});
+    const tube=(pts,r,mat,seg)=>add(new T.TubeGeometry(new T.CatmullRomCurve3(pts),seg||40,r,7,false),mat||bone,19);
+    // omurga: C3–L5, göğüste kifoz, belde lordoz
+    const ZV=[[5.6,-1.45],[3.8,-1.8],[1.0,-2.1],[-1.5,-2.0],[-5.6,-1.55]];
+    const zvb=(y)=>{ for(let i=0;i<ZV.length-1;i++){ const [ya,za]=ZV[i],[yb,zb]=ZV[i+1]; if(y<=ya&&y>=yb){ const t=(ya-y)/(ya-yb); return za+(zb-za)*(t*t*(3-2*t)); } } return y>ZV[0][0]?ZV[0][1]:ZV[ZV.length-1][1]; };
+    const TV=(n)=>3.8-(n-1)*0.54; // T1..T12 gövde merkezleri
+    const lev=[]; for(let n=1;n<=4;n++) lev.push([TV(1)+0.5*(5-n)+0.05,0.26,0.34]); // C4..C7
+    for(let n=1;n<=12;n++) lev.push([TV(n),0.34+0.01*n,0.42]);
+    for(let n=1;n<=5;n++) lev.push([TV(12)-0.62*n,0.46,0.52]);   // L1..L5
+    lev.forEach(([y,r,h])=>{
+      const z=zvb(y), b=add(new T.CylinderGeometry(r,r*1.04,h*0.82,14),vert,18); b.position.set(TOR.cx,y,z); b.rotation.x=0.05;
+      const sp=add(new T.BoxGeometry(0.12,0.2,0.62),vert,18); sp.position.set(TOR.cx,y-0.12,z-r-0.32); sp.rotation.x=-0.45;
+      const tp=add(new T.BoxGeometry(r*3.6,0.12,0.16),vert,18); tp.position.set(TOR.cx,y,z-r-0.05);
+    });
+    // kaburgalar: baş omurgada, öne doğru inip kıkırdakla sternuma bağlanır
+    const RIB=[ // [ön uç açısı, ön uç y, sternal bağlantı y]
+      [0.5,2.72,2.92],[0.6,2.08,2.36],[0.68,1.42,1.78],[0.74,0.76,1.2],[0.8,0.08,0.66],[0.86,-0.62,0.12],[0.92,-1.32,-0.55],
+      [1.02,-1.95,null],[1.12,-2.45,null],[1.24,-2.9,null],[1.9,-2.85,null],[2.3,-2.8,null]];
+    const cartP=[];
+    RIB.forEach(([aE,yE,yS],i)=>{
+      const n=i+1, yh=TV(n), short=n>=11;
+      for(const sg of [-1,1]){
+        const head=V(TOR.cx+sg*0.4,yh,zvb(yh)), tub=V(TOR.cx+sg*0.78,yh-0.04,zvb(yh)-0.36);
+        const pts=[head,tub]; const N=short?7:14, a0=Math.PI-0.5;
+        for(let k=1;k<=N;k++){ const u=k/N, a=sg*(a0+(aE-a0)*u), y=yh-0.08-(yh-0.08-yE)*Math.pow(u,1.45); pts.push(cage(y,a,1)); }
+        tube(pts,n===1?0.085:0.065,bone,short?24:48);
+        // kıkırdak
+        if(yS!==null){ const cp=[]; for(let k=0;k<=8;k++){ const u=k/8, a=sg*(aE+(0.13-aE)*u), y=yE+(yS-yE)*(1-Math.pow(1-u,1.6)); cp.push(cage(y,a,1.01)); } tube(cp,0.06,cart,20); cartP[n]=cartP[n]||{}; cartP[n][sg]={aE,yE,yS}; }
+        else if(n<=10){ const pr=cartP[n-1]&&cartP[n-1][sg]||cartP[7][sg], ua=0.55, at=pr.aE+(0.13-pr.aE)*ua, yt=pr.yE+(pr.yS-pr.yE)*(1-Math.pow(1-ua,1.6));
+          const cp=[]; for(let k=0;k<=8;k++){ const u=k/8, a=sg*(aE+(at-aE)*u), y=yE+(yt-yE)*(1-Math.pow(1-u,1.4)); cp.push(cage(y,a,1.01)); } tube(cp,0.055,cart,20);
+          cartP[n]=cartP[n]||{}; cartP[n][sg]={aE,yE,yS:yt,at}; }
+      }
+    });
+    // sternum: manubrium + gövde + ksifoid; ön yüzü göğüs kafesinin ön eğrisini izler
+    const S=[[0,3.08],[0.24,3.17],[0.52,3.12],[0.6,2.85],[0.46,2.42],[0.42,2.3],[0.48,1.6],[0.53,0.6],[0.48,-0.2],[0.34,-0.82],[0.17,-0.95],[0.11,-1.5],[0,-1.68]];
+    const sh=new T.Shape(); S.forEach(([x,y],i)=>i?sh.lineTo(x,y):sh.moveTo(x,y)); for(let i=S.length-2;i>0;i--) sh.lineTo(-S[i][0],S[i][1]); sh.closePath();
+    const sg=new T.ExtrudeGeometry(sh,{depth:0.22,bevelEnabled:true,bevelThickness:0.04,bevelSize:0.04,bevelSegments:2,curveSegments:4});
+    { const pa=sg.attributes.position; for(let i=0;i<pa.count;i++){ const y=pa.getY(i), fz=cage(Math.min(3.1,y),0,1).z; pa.setXYZ(i,TOR.cx+pa.getX(i),y,fz-0.2+pa.getZ(i)); } sg.computeVertexNormals(); }
+    add(sg,bone,19);
+    // köprücük kemikleri (S şekilli) ve skapulalar
+    const mz=cage(3.12,0,1).z;
+    for(const s of [-1,1]){
+      tube([V(TOR.cx+s*0.5,3.12,mz-0.02),V(TOR.cx+s*1.3,3.22,mz+0.06),V(TOR.cx+s*2.3,3.3,mz-0.2),V(TOR.cx+s*3.05,3.36,-0.55),V(TOR.cx+s*3.55,3.28,-0.85)],0.085,bone,30);
+      const tri=[[1.3,3.05],[1.55,0.3],[2.95,2.6]], NG=10, sp=[], si=[];
+      const backPt=(dx,y,k)=>{ const [rx,rz,e,dz]=profAt(CAGE,y), s2=Math.min(0.999,Math.pow(Math.abs(dx)/rx,e/2)), a=Math.PI-Math.asin(s2); return shell(CAGE,y,s*a,k); };
+      for(let i=0;i<=NG;i++) for(let j=0;j<=NG-i;j++){ const u=i/NG,v=j/NG,w=1-u-v, dx=tri[0][0]*w+tri[1][0]*u+tri[2][0]*v, y=tri[0][1]*w+tri[1][1]*u+tri[2][1]*v; const p=backPt(dx,y,1.08); sp.push(p.x,p.y,p.z); }
+      const id=(i,j)=>{ let o=0; for(let r=0;r<i;r++) o+=NG-r+1; return o+j; };
+      for(let i=0;i<NG;i++) for(let j=0;j<NG-i;j++){ si.push(id(i,j),id(i+1,j),id(i,j+1)); if(j<NG-i-1) si.push(id(i+1,j),id(i+1,j+1),id(i,j+1)); }
+      const g2=new T.BufferGeometry(); g2.setAttribute('position',new T.Float32BufferAttribute(sp,3)); g2.setIndex(si); g2.computeVertexNormals(); add(g2,bone,19);
+      tube([backPt(1.45,2.55,1.1),backPt(2.3,2.75,1.16),V(TOR.cx+s*3.3,3.15,-1.0),V(TOR.cx+s*3.55,3.25,-0.88)],0.06,bone,20); // spina scapulae → akromion
+    }
+    // ---- trakea ve ana bronşlar
+    const air=ghost(0xd6e5ea,0.06,0.42,{rim:0xf4fbff});
+    const tr=add(new T.TubeGeometry(new T.CatmullRomCurve3([V(TOR.cx,5.9,-0.35),V(TOR.cx,4.3,-0.42),V(TOR.cx,3.0,-0.7),V(TOR.cx+0.04,1.85,-0.98)]),40,0.3,12,false),air,17);
+    tube([V(TOR.cx+0.04,1.95,-0.98),V(TOR.cx-0.55,1.6,-1.0),V(TOR.cx-1.1,1.25,-1.05)],0.2,air,16).renderOrder=17;
+    tube([V(TOR.cx+0.04,1.95,-0.98),V(TOR.cx+0.75,1.6,-1.1),V(TOR.cx+1.45,1.12,-1.15)],0.19,air,16).renderOrder=17;
+    // ---- akciğerler: kafesin içini doldurur, kalbe ve mediastene yer bırakır (kardiyak çentik)
+    const HE={c:V(0.17,-0.12,0.2),r:V(1.6,1.52,1.5)}, GV={c:V(-0.25,1.75,-0.35),r:V(1.1,1.25,1.15)};
+    const latPush=(p,E,s)=>{ const dy=(p.y-E.c.y)/E.r.y, dz=(p.z-E.c.z)/E.r.z, dx=(p.x-E.c.x)/E.r.x; if(dx*dx+dy*dy+dz*dz<1){ const h=Math.sqrt(Math.max(0,1-dy*dy-dz*dz)); const xb=E.c.x+s*E.r.x*h; if(s*(p.x-xb)<0) p.x=xb; } };
+    const lungM=ghost(0xee9ea6,0.025,0.32,{rim:0xffe4e8});
+    for(const s of [-1,1]){
+      const geo=new T.SphereGeometry(1,72,56), pa=geo.attributes.position, c=V(TOR.cx+s*1.75,0.45,TOR.cz-0.15), r=V(1.75,3.45,2.45), p=V(0,0,0);
+      for(let i=0;i<pa.count;i++){
+        p.set(c.x+pa.getX(i)*r.x,c.y+pa.getY(i)*r.y,c.z+pa.getZ(i)*r.z);
+        clampIn(CAGE,p,0.93);
+        const front=(p.z-TOR.cz), m=front>0.6?0.14:front<-1.0?0.72:0.14+(0.6-front)/1.6*0.58;
+        if(s*(p.x-TOR.cx)<m) p.x=TOR.cx+s*m;
+        latPush(p,HE,s); latPush(p,GV,s);
+        const dd=dia(p.x,p.z)+0.05; if(p.y<dd) p.y=dd;
+        clampIn(CAGE,p,0.94);
+        pa.setXYZ(i,p.x,p.y,p.z);
+      }
+      geo.computeVertexNormals(); add(geo,lungM,17);
+    }
+    // ---- diyafram ve karaciğer
+    const NR=22, NT=72, dp=[], di=[];
+    for(let i=0;i<=NR;i++) for(let j=0;j<=NT;j++){ const rr=i/NR, a=-Math.PI+2*Math.PI*j/NT, q=cage(-2.2,a,0.97*rr); dp.push(q.x,dia(q.x,q.z),q.z); }
+    for(let i=0;i<NR;i++) for(let j=0;j<NT;j++){ const a=i*(NT+1)+j,b=a+NT+1; di.push(a,b,a+1,b,b+1,a+1); }
+    const dg=new T.BufferGeometry(); dg.setAttribute('position',new T.Float32BufferAttribute(dp,3)); dg.setIndex(di); dg.computeVertexNormals();
+    add(dg,ghost(0xb85a50,0.03,0.34,{rim:0xffc2b4}),16);
+    const lg=new T.SphereGeometry(1,56,40), la=lg.attributes.position, lc=V(TOR.cx-0.75,-2.35,TOR.cz+0.35), lr=V(2.7,1.3,1.95), q=V(0,0,0);
+    for(let i=0;i<la.count;i++){
+      q.set(lc.x+la.getX(i)*lr.x,lc.y+la.getY(i)*lr.y,lc.z+la.getZ(i)*lr.z);
+      const u=(q.x-TOR.cx)/3.2; if(u>0) q.y=lc.y+(q.y-lc.y)*Math.max(0.25,1-0.9*u);
+      const dd=dia(q.x,q.z)-0.06; if(q.y>dd) q.y=dd; if(q.y<-4.1) q.y=-4.1+(q.y+4.1)*0.2;
+      clampIn(CAGE,q,0.95); la.setXYZ(i,q.x,q.y,q.z);
+    }
+    lg.computeVertexNormals(); add(lg,ghost(0x9c4a3a,0.04,0.3,{rim:0xe6a08c}),15);
   })();
-  const TORSO_VIEW={pos:V(4.4,1.4,22.5),target:V(-0.2,-0.65,0)};
+  const TORSO_VIEW={pos:V(TOR.cx+1.4,1.2,27.5),target:V(TOR.cx+0.15,-0.55,0)};
   let camAnim=null;
   function flyTo(pos,target,dur){ camAnim={p0:camera.position.clone(),t0:controls.target.clone(),p1:pos.clone(),t1:target.clone(),s:performance.now(),d:dur||900}; }
   function camStep(){ if(!camAnim) return; let k=(performance.now()-camAnim.s)/camAnim.d; if(k>=1){k=1;} const e=k<0.5?2*k*k:1-Math.pow(-2*k+2,2)/2; camera.position.lerpVectors(camAnim.p0,camAnim.p1,e); controls.target.lerpVectors(camAnim.t0,camAnim.t1,e); if(k>=1) camAnim=null; }
@@ -893,11 +1024,11 @@ function create(el,opts){
   const tmpV=V(0,0,0);
   function clearTX(){ while(TXG.children.length){ const o=TXG.children.pop(); o.traverse(x=>{x.geometry&&x.geometry.dispose(); x.material&&x.material.dispose&&x.material.dispose();}); } BODY.position.set(0,0,0); BODY.scale.set(1,1,1); shockLight.intensity=0; if(R){ R.nerveMat.vagus.emissiveIntensity=0.6; } TX=null; }
   function pad(y,a){
-    const p=surf(y,a,1.01), n=p.clone().sub(V(TOR.cx,y,TOR.cz)).setY(0).normalize();
+    const p=skinPt(y,a,0.05), n=p.clone().sub(V(TOR.cx,y,TOR.cz+profAt(SKIN,y)[3])).setY(0).normalize();
     const g=new T.Group(); g.position.copy(p); g.lookAt(p.clone().add(n));
-    const body=new T.Mesh(new T.BoxGeometry(0.95,1.25,0.07),new T.MeshStandardMaterial({color:0xeeeeee,roughness:0.6,emissive:0xff9a2a,emissiveIntensity:0}));
-    const gel=new T.Mesh(new T.BoxGeometry(0.75,1.0,0.075),new T.MeshStandardMaterial({color:0x6a7c8a,roughness:0.4,emissive:0xffd060,emissiveIntensity:0}));
-    gel.position.z=-0.005; g.add(body,gel); g.userData={body,gel,n}; TXG.add(g); return g;
+    const body=new T.Mesh(new T.BoxGeometry(1.45,1.9,0.08),new T.MeshStandardMaterial({color:0xf4f4f4,roughness:0.6,emissive:0xff9a2a,emissiveIntensity:0,transparent:true}));
+    const gel=new T.Mesh(new T.BoxGeometry(1.15,1.55,0.085),new T.MeshStandardMaterial({color:0x6a7c8a,roughness:0.4,emissive:0xffd060,emissiveIntensity:0,transparent:true}));
+    gel.position.z=-0.005; body.renderOrder=26; gel.renderOrder=27; g.add(body,gel); g.userData={body,gel,n}; TXG.add(g); return g;
   }
   function bolt(a,b,mid){
     const pts=[a]; for(let i=1;i<9;i++){ const t=i/9, p=i<5?a.clone().lerp(mid,t*2):mid.clone().lerp(b,(t-0.5)*2); p.x+=(Math.random()-0.5)*0.35; p.y+=(Math.random()-0.5)*0.35; p.z+=(Math.random()-0.5)*0.35; pts.push(p); } pts.push(b);
@@ -907,7 +1038,7 @@ function create(el,opts){
   function treat(kind,o){
     clearTX(); o=o||{}; const t0=performance.now();
     TX={kind,t0,o,fired:false,d:{defib:3600,cardiovert:3200,pci:7000,iv:3600,vagal:3200,cpr:4200}[kind]||3000};
-    if(kind==='defib'||kind==='cardiovert'){ TX.a=pad(1.75,-0.62); TX.b=pad(-1.15,1.35); }
+    if(kind==='defib'||kind==='cardiovert'){ TX.a=pad(2.05,-0.3); TX.b=pad(-0.85,0.92); }
     if(kind==='pci'&&R){
       const k=o.vessel||'lad', occ=R.FX.occl[k]; occ.g.updateMatrixWorld(true); const end=occ.g.getWorldPosition(V(0,0,0));
       const root=worldOf('aroot')||R.L.lm.aorta_root.clone(), arch=worldOf('arch')||root.clone().add(V(0.3,1.6,-0.4)), desc=worldOf('adesc')||arch.clone().add(V(0.6,-1.5,-0.9));
@@ -923,8 +1054,8 @@ function create(el,opts){
     }
     if(kind==='iv'&&R){
       const L=R.L.lm, svc=(L.svc_low||V(-0.94,1.2,-0.44)).clone(), tri=R.L.triC.clone(), apx=R.L.apex.clone(), pv=(L.pulv||V(0.09,0.7,0.54)).clone();
-      const arm=surf(2.6,-1.35,1.02);
-      const line=new T.CatmullRomCurve3([arm.clone().add(V(-1.2,-0.3,0)),arm,svc.clone().add(V(-0.25,1.5,0.1)),svc]);
+      const arm=skinPt(1.75,-1.3,0.03);
+      const line=new T.CatmullRomCurve3([arm.clone().add(V(-0.9,-0.9,0.1)),arm,svc.clone().add(V(-0.25,1.5,0.1)),svc]);
       const lineM=new T.Mesh(new T.TubeGeometry(line,60,0.03,6,false),new T.MeshBasicMaterial({color:0x5b86c9,transparent:true,opacity:0.75,depthTest:false})); lineM.renderOrder=30; TXG.add(lineM);
       const path=new T.CatmullRomCurve3([arm,svc.clone().add(V(-0.25,1.5,0.1)),svc,tri.clone().add(V(-0.35,0.05,0.1)),tri,tri.clone().lerp(apx,0.45),pv,pv.clone().add(V(0.3,0.7,-0.4))]);
       TX.path=path; TX.dots=[];
@@ -932,8 +1063,8 @@ function create(el,opts){
       for(let i=0;i<36;i++){ const d=new T.Mesh(new T.SphereGeometry(0.05,10,8),mat); d.renderOrder=32; d.visible=false; d.userData.off=i/36*0.45; TXG.add(d); TX.dots.push(d); }
     }
     if(kind==='cpr'){
-      const p=surf(-0.4,0,1.04), hand=new T.Mesh(new T.SphereGeometry(1,20,14),new T.MeshStandardMaterial({color:0xf1c6ad,transparent:true,opacity:0.85,roughness:0.7,emissive:0x5a3424,emissiveIntensity:0.8,depthTest:false}));
-      hand.scale.set(0.7,0.42,0.22); hand.position.copy(p).add(V(0,0,0.25)); TXG.add(hand); TX.hand=hand; TX.hp=hand.position.clone();
+      const p=skinPt(-0.35,0,0.04), hand=new T.Mesh(new T.SphereGeometry(1,20,14),new T.MeshStandardMaterial({color:0xf1c6ad,transparent:true,opacity:0.85,roughness:0.7,emissive:0x5a3424,emissiveIntensity:0.8,depthTest:false}));
+      hand.scale.set(0.85,0.5,0.26); hand.position.copy(p).add(V(0,0,0.24)); TXG.add(hand); TX.hand=hand; TX.hp=hand.position.clone();
     }
   }
   function txStep(){
