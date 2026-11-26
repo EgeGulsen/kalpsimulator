@@ -63,7 +63,7 @@ function navAnatomy(){
 let navOpen=false;
 function navConds(){
   const c=COND[condKey];
-  return `<button class="navtog" type="button" data-navtog aria-expanded="${navOpen}"><span><small>Senaryo seç · ${Object.keys(COND).length} durum</small>${esc(c.n)}</span><i aria-hidden="true">▾</i></button><div class="navbody">`+CATS.map(([k,nm])=>`<div class="grp-h">${esc(nm)}</div>`+Object.entries(COND).filter(([,c])=>c.cat===k).map(([key,c])=>`<button class="item cond" type="button" data-cond="${key}" aria-current="${key===condKey}">${esc(c.n)}</button>`).join('')).join('')+`</div>`;
+  return `<button class="navtog" type="button" data-navtog aria-expanded="${navOpen}"><span><small>Senaryo seç · ${Object.keys(COND).length} durum</small>${esc(c.n)}</span><i aria-hidden="true">▾</i></button><div class="navbody">`+CATS.map(([k,nm])=>`<div class="grp-h">${esc(nm)}</div>`+Object.entries(COND).filter(([,c])=>c.cat===k).map(([key,c])=>`<button class="item cond" type="button" data-cond="${key}" aria-current="${key===condKey}">${esc(c.n)}${CASES.some(x=>x.cond===key)?'<span class="vtag" title="Bu durum için hasta vakası var">Vaka</span>':''}</button>`).join('')).join('')+`</div>`;
 }
 function renderNav(){
   const ae=document.activeElement&&document.activeElement.id==='search', pos=ae?$('search').selectionStart:0;
@@ -88,9 +88,9 @@ const card=$('card');
 function kindHTML(k){return `<span class="kind"><b style="background:${KCOL[k]||'#888'}"></b>${KIND[k]||''}</span>`;}
 const closeBtn=`<button class="x" id="cardX" type="button" aria-label="Kartı kapat">×</button>`;
 function anatomyHTML(){
-  if(!selected) return `${closeBtn}<div><div class="eyebrow">Anatomi</div><h2>Kalbi keşfet</h2></div>
-    <p>Gerçek ölçülerden alınmış bir insan kalbi. Sürükleyerek çevir, kaydırarak yakınlaştır. Kasa, bir damara ya da dalına dokun: adı tıkladığın noktada görünür, ayrıntısı burada açılır.</p>
-    <p><b>İsimler</b> düğmesi görünen tüm yapıları etiketler. <b>İçini göster</b> kası saydamlaştırır ve ileti sistemini ortaya çıkarır.</p>
+  if(!selected) return `${closeBtn}<div><div class="eyebrow">Anatomi</div><h2>Kalp anatomisi</h2></div>
+    <p>Model, gerçek bir insan kalbinin BodyParts3D taramasından üretildi. Odacıklar, kapaklar, koroner arter dalları, kardiyak venler, ileti sistemi ve otonom sinirler ayrı ayrı seçilebilir. Her yapının Latince adı, kanlanması ve klinik önemi burada açılır.</p>
+    <p>Sürükleyerek çevir, kaydırarak yakınlaştır, bir yapıya tıklayarak seç. <b>İçini göster</b> miyokardı saydamlaştırıp ileti sistemini ortaya çıkarır; <b>Parçalar</b> tek tek gizleme ve izole etme sağlar.</p>
     <div class="legend"><span><i class="sw" style="background:var(--cond)"></i>İleti sistemi</span><span><i class="sw" style="background:repeating-linear-gradient(90deg,var(--cond) 0 5px,transparent 5px 9px)"></i>Otonom sinir</span><span><i class="sw" style="background:#d8414a"></i>Arter</span><span><i class="sw" style="background:#5a5fb4"></i>Ven</span></div>
     <div class="disc">Toplam ${Object.keys(S).length} yapı. Soldaki listeden ya da arama kutusundan da seçebilirsin.</div>`;
   const s=S[selected], par=s.p&&S[s.p];
@@ -115,7 +115,7 @@ function stateOf(id){
   if(k==='ileti'){
     if(fx.block===id) return ['blk','Bu durumda bloklu'];
     if(fx.blockFlash===id) return ['blk','Bazı uyarıları geçirmiyor'];
-    if(id==='ap') return fx.ap?['on','Bu durumda çalışıyor']:['off','Bu kişide yok'];
+    if(id==='ap') return fx.ap?['on','Bu durumda çalışıyor']:['off','Normal kalpte bulunmaz (yalnız preeksitasyonda)'];
     return c.off.includes(id)?['off','Bu durumda çalışmıyor']:['on','Bu durumda çalışıyor'];
   }
   if(k==='sinir') return c.nerveOn.includes(id)?['on','Bu durumda baskın']:['off','Bu durumda baskın değil'];
@@ -127,11 +127,14 @@ function condHTML(){
   if(selected&&S[selected]){const st=stateOf(selected); sel=`<div class="selmini"><b>${esc(S[selected].n)}</b>${st?`<span class="${st[0]}">● ${st[1]}</span>`:''}<span style="color:var(--muted)">${esc(S[selected].d)}</span></div>`;}
   const leg=[`<span><i class="sw" style="background:#ffd84a"></i>Uyarı dalgası</span>`,`<span><i class="sw" style="background:#d8202f"></i>Kasılan kas</span>`,`<span><i class="sw" style="background:var(--cond)"></i>Çalışan yol</span>`,`<span><i class="sw" style="background:var(--cond-dim)"></i>Çalışmayan yol</span>`];
   if(fx.af) leg.push(`<span><i class="sw" style="background:var(--af)"></i>Titreşen atriyum</span>`);
-  if(fx.infarct) leg.push(`<span><i class="sw" style="background:#86607a"></i>Kansız kalan kas</span>`);
-  if(fx.scar) leg.push(`<span><i class="sw" style="background:#6a5b54"></i>Eski skar</span>`);
+  if(fx.infarct) leg.push(`<span><i class="sw" style="background:#86607a"></i>İskemik miyokard</span>`);
+  if(fx.scar) leg.push(`<span><i class="sw" style="background:#6a5b54"></i>Skar (eski infarkt)</span>`);
   if(fx.block||fx.blockFlash) leg.push(`<span><i class="sw" style="background:var(--block)"></i>Blok</span>`);
   const read=c.read?`<dl class="read">${Object.entries(c.read).map(([k,v])=>`<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>`:'';
+  const cs=CASES.find(x=>x.cond===condKey);
+  const go=cs?`<button class="vgo" type="button" data-gocase="${cs.id}"><span><small>Vaka</small><b>Bu durumu bir hasta üzerinde yönet</b></span><i aria-hidden="true">→</i></button>`:'';
   return `${closeBtn}<div><div class="eyebrow">${esc(c.tag)}</div><h2>${esc(c.n)}</h2></div>
+    ${go}
     <div class="beats"><span class="beat"><i id="bA"></i>Atriyumlar</span><span class="beat"><i id="bV"></i>Ventriküller</span></div>
     <p>${esc(c.sum)}</p>
     ${read}
@@ -157,6 +160,7 @@ function render(){
 }
 card.addEventListener('click',e=>{
   if(e.target.id==='cardX'){cardOpen=false; card.classList.add('hide'); insets(); return;}
+  const gc=e.target.closest('[data-gocase]'); if(gc){ location.hash='#vaka/'+gc.dataset.gocase; return; }
   if(mode==='vaka'){ const va=e.target.closest('[data-va]'); if(va){ vkAnswer(+va.dataset.va); return; }
     const vl=e.target.closest('[data-vlv]'); if(vl){ setVLevel(+vl.dataset.vlv); return; }
     if(e.target.closest('[data-vstart]')){ startCase(e.target.closest('[data-vstart]').dataset.vstart||null); return; }
@@ -170,7 +174,7 @@ card.addEventListener('click',e=>{
   const ls=e.target.closest('[data-lesson]'); if(ls){ setLesson(ls.dataset.lesson); card.scrollTop=0; return; }
   const b=e.target.closest('[data-id]'); if(b) select(b.dataset.id);
 });
-card.addEventListener('input',e=>{ if(e.target.id==='faqq'){ faqQ=e.target.value; const q=faqQ.trim().toLocaleLowerCase('tr'); card.querySelectorAll('.faq details').forEach(d=>{d.hidden=!!q&&!d.textContent.toLocaleLowerCase('tr').includes(q);}); } });
+card.addEventListener('input',e=>{ if(e.target.id==='faqq'){ faqQ=e.target.value; const q=faqQ.trim().toLocaleLowerCase('tr'); card.querySelectorAll('.faq details').forEach(d=>{d.hidden=!!q&&!d.textContent.toLocaleLowerCase('tr').includes(q);}); card.querySelectorAll('.faqg').forEach(g=>{g.hidden=!g.querySelector('details:not([hidden])');}); } });
 function openCard(){ if(!cardOpen){cardOpen=true; card.classList.remove('hide'); insets();} }
 function select(id){
   if(id&&!S[id]) id=null;
@@ -182,17 +186,19 @@ function select(id){
 /* ---------- Öğren ---------- */
 function navLearn(){
   return `<div class="grp-h">Dersler</div>`+LESSONS.map((l,i)=>`<button class="item" type="button" data-lesson="${l.id}" aria-current="${l.id===lesson}"><small style="margin:0;min-width:18px">${i+1}</small>${esc(l.t)}</button>`).join('')+
-    `<div class="grp-h">Soru–cevap</div><button class="item" type="button" data-lesson="sss" aria-current="${lesson==='sss'}"><small style="margin:0;min-width:18px">?</small>Sık sorulan sorular (${FAQ.length})</button>`;
+    `<div class="grp-h">Soru–cevap</div><button class="item" type="button" data-lesson="sss" aria-current="${lesson==='sss'}"><small style="margin:0;min-width:18px">?</small>Klinik soru–cevap (${FAQ.length})</button>`;
 }
 function learnHTML(){
-  if(lesson==='sss') return `${closeBtn}<div><div class="eyebrow">Soru–cevap</div><h2>Sık sorulan sorular</h2></div>
-    <input class="search" id="faqq" type="search" placeholder="Soru ara: ör. troponin, şok, QT" value="${esc(faqQ)}" aria-label="Soru ara">
-    <div class="faq">${FAQ.map(([q,a])=>`<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('')}</div>
-    <div class="disc">Tıbbi tavsiye değildir. Kendi sağlığınla ilgili sorular için bir hekime danış.</div>`;
+  if(lesson==='sss'){ const groups=[...new Set(FAQ.map(f=>f[0]))];
+    return `${closeBtn}<div><div class="eyebrow">Soru–cevap · ${FAQ.length} soru</div><h2>Klinik soru–cevap</h2></div>
+    <p>Staj ve sınavlarda sık sorulan, kavram ve yönetim odaklı sorular. Değerler güncel ESC, ERC ve AHA kılavuzlarından özetlenmiştir.</p>
+    <input class="search" id="faqq" type="search" placeholder="Ara: ör. Sgarbossa, QTc, hiperkalemi" value="${esc(faqQ)}" aria-label="Soru ara">
+    <div class="faq">${groups.map(g=>`<div class="faqg"><div class="eyebrow">${esc(g)}</div>${FAQ.filter(f=>f[0]===g).map(([,q,a])=>`<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('')}</div>`).join('')}</div>
+    <div class="disc">Eğitim amaçlıdır. Doz ve algoritmalar kurum protokollerine ve güncel kılavuzlara göre doğrulanmalıdır.</div>`; }
   const i=LESSONS.findIndex(l=>l.id===lesson), l=LESSONS[i], prev=LESSONS[i-1], next=LESSONS[i+1];
   return `${closeBtn}<div><div class="eyebrow">Ders ${i+1} / ${LESSONS.length}</div><h2>${esc(l.t)}</h2></div>
     <div class="lesson">${l.body}</div>
-    <div class="pager">${prev?`<button class="btn" type="button" data-lesson="${prev.id}">← ${esc(prev.t)}</button>`:'<span></span>'}${next?`<button class="btn" type="button" data-lesson="${next.id}">${esc(next.t)} →</button>`:`<button class="btn" type="button" data-lesson="sss">Sık sorulan sorular →</button>`}</div>
+    <div class="pager">${prev?`<button class="btn" type="button" data-lesson="${prev.id}">← ${esc(prev.t)}</button>`:'<span></span>'}${next?`<button class="btn" type="button" data-lesson="${next.id}">${esc(next.t)} →</button>`:`<button class="btn" type="button" data-lesson="sss">Klinik soru–cevap →</button>`}</div>
     <div class="disc">Değerler erişkinler için genel kabul gören aralıklardır. EKG eğrileri bu sitedeki basitleştirilmiş vektör modelinden üretilir.</div>`;
 }
 function setLesson(id){
@@ -257,26 +263,26 @@ window.addEventListener('resize',size12);
 function draw12(){
   const W=c12.clientWidth, H=c12.clientHeight; if(!W) return;
   const cw=W/4, rh=H/3, win=Math.max(1.6,Math.min(2.6,cw/95)), pps=cw/win, ppmv=Math.min(pps*0.4,rh*0.36), t1=sim.t, t0=t1-win;
-  x12.fillStyle='#050b0a'; x12.fillRect(0,0,W,H);
-  // ızgara
-  x12.lineWidth=1;
-  for(let k=Math.ceil(t0/0.2);k*0.2<=t1;k++){ for(let c=0;c<4;c++){const x=c*cw+(k*0.2-t0)*pps; x12.strokeStyle=GRID2; x12.beginPath(); x12.moveTo(x+.5,0); x12.lineTo(x+.5,H); x12.stroke();} }
-  for(let r=0;r<3;r++){ const base=r*rh+rh*0.6; for(let k=-3;k<=2;k++){const y=base-k*ppmv*0.5; if(y<r*rh||y>(r+1)*rh) continue; x12.strokeStyle=GRID; x12.beginPath(); x12.moveTo(0,y+.5); x12.lineTo(W,y+.5); x12.stroke();} }
+  x12.fillStyle=PAPER; x12.fillRect(0,0,W,H);
+  // EKG kâğıdı ızgarası: 1 mm = 0,04 sn / 0,1 mV, 5 mm = 0,2 sn / 0,5 mV
+  x12.lineWidth=1; const mm=0.04*pps, minor=mm>=3;
+  for(let c=0;c<4;c++){ const k0=Math.ceil(t0/0.04); for(let k=k0;k*0.04<=t1;k++){ if(!minor&&k%5) continue; const x=Math.round(c*cw+(k*0.04-t0)*pps)+.5; x12.strokeStyle=k%5===0?GRID2:GRID; x12.beginPath(); x12.moveTo(x,0); x12.lineTo(x,H); x12.stroke(); } }
+  for(let r=0;r<3;r++){ const base=r*rh+rh*0.6, st=ppmv*0.1; for(let k=-Math.floor(rh*0.6/st);k*st<=rh*0.4;k++){ if(!(st>=3)&&k%5) continue; const y=Math.round(base+k*st)+.5; if(y<r*rh||y>(r+1)*rh) continue; x12.strokeStyle=k%5===0?GRID2:GRID; x12.beginPath(); x12.moveTo(0,y); x12.lineTo(W,y); x12.stroke(); } }
   // vektörleri bir kez hesapla, 12 derivasyona izdüşür
   const cols=traceCols(t0,pps,Math.ceil(cw)), vmap=new Map();
   for(const col of cols) for(const t of col.ts) if(!vmap.has(t)) vmap.set(t,vecAt(t));
-  x12.font='600 12px "IBM Plex Mono", monospace';
+  x12.font='600 12px "JetBrains Mono", monospace';
   for(let r=0;r<3;r++) for(let c=0;c<4;c++){
     const id=E12.GRID[r][c], ox=c*cw, base=r*rh+rh*0.6, sel=id===lead;
-    if(sel){x12.fillStyle='#ffd60a14'; x12.fillRect(ox,r*rh,cw,rh); x12.strokeStyle='#ffd60a99'; x12.lineWidth=1.5; x12.strokeRect(ox+1,r*rh+1,cw-2,rh-2);}
+    if(sel){x12.fillStyle='#b01f2d0d'; x12.fillRect(ox,r*rh,cw,rh); x12.strokeStyle='#b01f2d'; x12.lineWidth=1.5; x12.strokeRect(ox+1,r*rh+1,cw-2,rh-2);}
     x12.save(); x12.beginPath(); x12.rect(ox,r*rh,cw,rh); x12.clip();
-    x12.strokeStyle=sel?'#ffe680':ECG; x12.lineWidth=sel?2:1.6; x12.lineJoin='round'; x12.beginPath();
+    x12.strokeStyle=sel?'#b01f2d':ECG; x12.lineWidth=sel?1.9:1.4; x12.lineJoin='round'; x12.beginPath();
     strokeCols(x12,cols,t=>E12.leadValue(id,vmap.get(t),variant),v=>base-v*ppmv,ox);
     x12.stroke(); x12.restore();
-    x12.fillStyle=sel?'#ffd60a':'#9fe8c4'; x12.fillText(id==='I'||id==='II'||id==='III'?'D'+id:id,ox+7,r*rh+16);
-    if(c>0){x12.strokeStyle='#4df0a133'; x12.lineWidth=1; x12.beginPath(); x12.moveTo(ox+.5,r*rh); x12.lineTo(ox+.5,(r+1)*rh); x12.stroke();}
+    x12.fillStyle=sel?'#b01f2d':ECG; x12.fillText(id==='I'||id==='II'||id==='III'?'D'+id:id,ox+7,r*rh+16);
+    if(c>0){x12.strokeStyle=MUTED; x12.lineWidth=1; x12.beginPath(); x12.moveTo(ox+.5,r*rh); x12.lineTo(ox+.5,(r+1)*rh); x12.stroke();}
   }
-  x12.strokeStyle='#4df0a133'; for(let r=1;r<3;r++){x12.beginPath(); x12.moveTo(0,r*rh+.5); x12.lineTo(W,r*rh+.5); x12.stroke();}
+  x12.strokeStyle=GRID2; for(let r=1;r<3;r++){x12.beginPath(); x12.moveTo(0,r*rh+.5); x12.lineTo(W,r*rh+.5); x12.stroke();}
 }
 
 /* ---------- Etiketler ---------- */
@@ -622,8 +628,8 @@ function patientHTML(c){
     <div class="prow2"><b>Kronik</b><div>${p.kronik.map(chip).join('')}</div></div>
     <div class="prow2"><b>İlaçlar</b><div>${p.ilac.map(chip).join('')}</div></div>
     <div class="prow2"><b>Alerji</b><div>${p.alerji.map(chip).join('')}</div></div>
-    <div class="eyebrow" style="margin:4px 0 4px">Vital bulgular</div>${dl(c.vital)}
-    ${c.lab?`<div class="eyebrow" style="margin:8px 0 4px">Laboratuvar</div>${dl(c.lab)}`:''}
+    <div class="eyebrow pk">Vital bulgular</div>${dl(c.vital)}
+    ${c.lab?`<div class="eyebrow pk">Laboratuvar</div>${dl(c.lab)}`:''}
   </details>`;
 }
 function vakaHTML(){
@@ -681,22 +687,22 @@ $('btnAbout').addEventListener('click',()=>{const d=$('about'); d.showModal?d.sh
 /* ---------- EKG ---------- */
 const cv=$('ecg'), ctx=cv.getContext('2d');
 const css=getComputedStyle(document.documentElement), cssv=n=>css.getPropertyValue(n).trim();
-const ECG=cssv('--ecg'), GRID=cssv('--grid'), GRID2=cssv('--grid-strong'), MUTED=cssv('--muted');
+const ECG=cssv('--ecg-ink')||'#17171b', PAPER=cssv('--ecg-paper')||'#fff8f7', GRID=cssv('--ecg-minor')||'#f8dada', GRID2=cssv('--ecg-major')||'#eba9ab', MUTED=cssv('--ecg-label')||'#9a4b50';
 function sizeCanvas(){const r=cv.getBoundingClientRect(), d=Math.min(2,window.devicePixelRatio||1); if(!r.width||!r.height)return; cv.width=Math.round(r.width*d); cv.height=Math.round(r.height*d); ctx.setTransform(d,0,0,d,0,0);}
 function drawECG(){
   const W=cv.clientWidth, H=cv.clientHeight; if(!W) return;
   const win=Math.max(W<560?3:5,W/(1.1*H)), pps=W/win, ppmv=pps*0.4, base=H*0.6, t0=sim.t-win;
-  ctx.fillStyle='#050b0a'; ctx.fillRect(0,0,W,H); ctx.lineWidth=1;
+  ctx.fillStyle=PAPER; ctx.fillRect(0,0,W,H); ctx.lineWidth=1;
   for(let k=Math.ceil(t0/0.04);k*0.04<=sim.t;k++){const x=(k*0.04-t0)*pps; ctx.strokeStyle=k%5===0?GRID2:GRID; ctx.beginPath(); ctx.moveTo(x+0.5,0); ctx.lineTo(x+0.5,H); ctx.stroke();}
   const step=ppmv*0.1;
   for(let k=-Math.floor(base/step);k*step<=H-base;k++){const y=base+k*step; ctx.strokeStyle=k%5===0?GRID2:GRID; ctx.beginPath(); ctx.moveTo(0,y+0.5); ctx.lineTo(W,y+0.5); ctx.stroke();}
-  ctx.strokeStyle=ECG; ctx.lineWidth=2; ctx.lineJoin='round'; ctx.shadowColor=ECG; ctx.shadowBlur=6; ctx.beginPath();
+  ctx.strokeStyle=ECG; ctx.lineWidth=1.6; ctx.lineJoin='round'; ctx.beginPath();
   strokeCols(ctx,traceCols(t0,pps,Math.ceil(W)),t=>sim.ecgAt(t),v=>base-v*ppmv,0);
-  ctx.stroke(); ctx.shadowBlur=0;
-  ctx.fillStyle=ECG; ctx.beginPath(); ctx.arc(W-2,base-sim.ecgAt(sim.t)*ppmv,3,0,7); ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle='#b01f2d'; ctx.beginPath(); ctx.arc(W-3,base-sim.ecgAt(sim.t)*ppmv,3,0,7); ctx.fill();
   const c=COND[ecgKey()], r=c.r, X=t=>(t-t0)*pps, lb=ecgLabels();
   if(lb==='none') return; // soruda ipucu yazıları gizli
-  ctx.font='11px "IBM Plex Mono", monospace'; ctx.fillStyle=MUTED; ctx.textAlign='center';
+  ctx.font='500 11px "JetBrains Mono", monospace'; ctx.fillStyle=MUTED; ctx.textAlign='center';
   const lab=(txt,x,y)=>{if(x>14&&x<W-14) ctx.fillText(txt,x,y);};
   const done=sim.vent.filter(e=>e.t+0.6<sim.t&&e.t>t0+0.1), e=done[done.length-1];
   if(e&&r.vent!=='torsades'){
@@ -718,7 +724,7 @@ function drawECG(){
 
 /* ---------- Döngü ---------- */
 let last=0, hrTick=0;
-const RED=[255,75,85], AF=[255,154,60], OFF=[58,35,40];
+const RED=[214,40,52], AF=[224,122,31], OFF=[229,220,221];
 const mix=(a,b,k)=>`rgb(${a.map((v,i)=>Math.round(v+(b[i]-v)*k)).join(',')})`;
 function loop(ts){
   requestAnimationFrame(loop);

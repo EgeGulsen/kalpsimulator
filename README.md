@@ -91,7 +91,7 @@ vite.config.js          Vite ayarları
 css/style.css           Tüm stiller (koyu tema)
 js/content.js           Anatomi içerikleri: 63 yapı ve alt yapı (S, p = üst yapı), gruplar (GROUPS), kaynaklar (SOURCES)
 js/scenarios.js         Senaryolar (COND) ve kategoriler (CATS): neden, mekanizma, EKG, klinik not
-js/lessons.js           Öğren bölümünün dersleri (LESSONS) ve Sık Sorulan Sorular (FAQ)
+js/lessons.js           Öğren bölümünün dersleri (LESSONS) ve klinik soru–cevap (FAQ: [konu, soru, cevap])
 js/quiz.js              Sına bölümünün çoktan seçmeli soruları (MCQ) ve EKG soru havuzu (ECG_POOL)
 js/cases.js             Vaka bölümünün hasta vakaları (CASES) ve seviyeler (LEVELS)
 js/ecg12.js             12 derivasyon modeli: derivasyon yönleri, kalp vektörü, örnek kayıtlar
