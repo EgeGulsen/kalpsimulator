@@ -253,7 +253,55 @@ kbd{font-family:var(--font-mono);font-size:11px;min-width:20px;text-align:center
 .qres.no{background:#ff5c631f;color:#ffaab0}
 .qnext,.qgive{justify-self:start;display:inline-flex;align-items:center;gap:8px}
 .qlink a{color:var(--sel)}
-@media (max-width:980px){ .tabs a{padding:7px 13px} kbd{display:none} body.qtext .stage,body.qtext .toolbar{display:none} }
+@media (max-width:980px){ kbd{display:none} body.qtext .stage,body.qtext .toolbar{display:none} }
+
+
+/* Vaka */
+.torso-tog{display:none}
+body[data-mode="durumlar"] .torso-tog,body[data-mode="vaka"] .torso-tog{display:inline-flex}
+.flash{position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 50% 45%,#e8f6ffee,#9fd4ff55 45%,transparent 75%);opacity:0;z-index:2}
+.flash.on{animation:flash .45s ease-out}
+@keyframes flash{0%{opacity:1}100%{opacity:0}}
+.txcap{position:absolute;left:50%;bottom:96px;transform:translateX(-50%);z-index:3;background:#081012e6;border:1px solid #ffd60a66;color:#fff3b0;font-family:var(--font-display);font-weight:600;font-size:15px;padding:8px 16px;border-radius:999px;white-space:nowrap;pointer-events:none}
+.vlv{display:flex;gap:4px;padding:2px 8px 4px}
+.vlv button{flex:1;background:#ffffff0a;border:1px solid var(--line-2);color:var(--muted);border-radius:9px;padding:7px 4px;font:inherit;font-size:12.5px;cursor:pointer}
+.vlv button[aria-pressed="true"]{background:#ffd60a26;color:#fff3b0;border-color:#ffd60a66}
+.vlvd{margin:2px 8px 6px;font-size:12px;color:var(--faint)}
+.vlvc{display:grid;gap:6px}
+.vlvb{display:grid;gap:2px;text-align:left;background:#ffffff0a;border:1px solid var(--line-2);border-radius:11px;padding:10px 12px;color:var(--fg);font:inherit;cursor:pointer}
+.vlvb span{font-size:12.5px;color:var(--muted)}
+.vlvb[aria-pressed="true"]{background:#ffd60a1a;border-color:#ffd60a88}
+.vlvb[aria-pressed="true"] b{color:#fff3b0}
+.pcard{background:#ffffff08;border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+.pcard summary{display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer;list-style:none}
+.pcard summary::-webkit-details-marker{display:none}
+.pid{font-weight:600;font-size:14px}
+.psk{font-size:13.5px;margin:8px 0!important;color:#dfe8e6}
+.prow2{display:grid;grid-template-columns:62px 1fr;gap:6px;align-items:start;margin:4px 0;font-size:12.5px}
+.prow2 b{color:var(--muted);font-weight:500;padding-top:3px}
+.pchip{display:inline-block;background:#ffffff10;border:1px solid var(--line-2);border-radius:999px;padding:2px 9px;margin:0 4px 4px 0;font-size:12.5px;transition:background .3s,border-color .3s}
+.pchip.hit{background:#ff9a2a2e;border-color:#ff9a2a;color:#ffd7ad}
+.vprog{display:flex;gap:4px}
+.vprog i{flex:1;height:4px;border-radius:2px;background:#ffffff1a}
+.vprog i.ok{background:#4df0a1}.vprog i.no{background:#ff5c63}.vprog i.cur{background:#ffd60a}
+.vprev{margin:0;padding:0;list-style:none;display:grid;gap:3px;font-size:12px;color:var(--faint)}
+.vprev .ok{color:#8ff5c2aa}.vprev .no{color:#ffaab0aa}
+.vq{font-size:16px;line-height:1.35}
+.vopt span{display:grid;gap:4px}
+.why{font-style:normal;font-size:12.5px;color:#cfdad8;opacity:.9}
+.hintbox{border-left:3px solid var(--cond);background:#1b1a0e;border-radius:0 10px 10px 0;padding:8px 10px;display:grid;gap:6px}
+.hintbox p{margin:0;font-size:13px;color:#efe2a6}
+.hbtn{justify-self:start;background:none;border:1px solid #ffd60a66;color:#ffe680;border-radius:999px;padding:3px 10px;font:inherit;font-size:12.5px;cursor:pointer}
+.hnone{font-size:12px;color:var(--faint)}
+.vscore{display:flex;align-items:baseline;gap:12px}
+.vscore b{font-family:var(--font-display);font-size:40px;color:#fff3b0}
+.vscore span{color:var(--muted)}
+.vsteps{margin:0;padding:0;list-style:none;display:grid;gap:5px;font-size:13px}
+.vsteps li b{font-family:var(--font-mono);font-size:12px;margin-right:4px}
+.vsteps .ok b{color:#8ff5c2}.vsteps .no b{color:#ffaab0}
+.vbtns{display:flex;gap:8px;flex-wrap:wrap}
+.lnk{justify-self:start;background:none;border:0;color:var(--muted);font:inherit;font-size:12.5px;text-decoration:underline;cursor:pointer;padding:0}
+@media (max-width:980px){ .tabs a{padding:7px 9px;font-size:13px} .txcap{bottom:12px;font-size:13px} }
 
 /* Parçaları incele paneli */
 .tbtn{color:var(--fg);font:inherit;font-size:13px}

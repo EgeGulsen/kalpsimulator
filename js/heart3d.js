@@ -48,7 +48,7 @@ function create(el,opts){
   camera.position.copy(HOME.pos);
   const controls=new T.OrbitControls(camera,renderer.domElement);
   controls.enableDamping=true; controls.dampingFactor=0.08; controls.target.copy(HOME.target);
-  controls.minDistance=3.5; controls.maxDistance=18; controls.rotateSpeed=0.8;
+  controls.minDistance=3.5; controls.maxDistance=26; controls.rotateSpeed=0.8;
 
   scene.add(new T.HemisphereLight(0xffeeea,0x22161a,0.95));
   const key=new T.DirectionalLight(0xfff1e8,1.9); key.position.set(3,5,7); scene.add(key);
@@ -57,12 +57,13 @@ function create(el,opts){
   // kamerayla dönen hafif ışık: hangi açıdan bakılırsa bakılsın model aydınlık kalır
   const head=new T.DirectionalLight(0xffffff,0.4); camera.add(head); head.position.set(0,0,1); scene.add(camera);
 
-  const H=new T.Group(); scene.add(H);           // tüm kalp (tamponad salınımı)
+  const BODY=new T.Group(); scene.add(BODY);     // gövde + kalp (şokta sarsılır, KPR’de sıkışır)
+  const H=new T.Group(); BODY.add(H);           // tüm kalp (tamponad salınımı)
   const AG=new T.Group(), VG=new T.Group(), SG=new T.Group();
   AG.matrixAutoUpdate=false; VG.matrixAutoUpdate=false;
   H.add(AG,VG,SG);
 
-  const state={mode:'anatomi',xray:false,selected:null,off:[],nerveOn:[],key:'nsr',cond:null,fx:{},layers:{vessels:true,cond:true,nerves:true},parts:{},focus:'none',others:1};
+  const state={mode:'anatomi',xray:false,selected:null,off:[],nerveOn:[],key:'nsr',cond:null,fx:{},layers:{vessels:true,cond:true,nerves:true},parts:{},focus:'none',others:1,torso:false};
   const api={canvas:renderer.domElement,ready:false};
   let R=null; // modele bağlı her şey burada
 
@@ -493,7 +494,7 @@ function create(el,opts){
       .forEach(([id,p,obj])=>anchors.push({id,obj,p:p.clone(),out:p.clone().sub(hc).normalize(),inner:true,cond:true}));
     anchors.push({id:'vagus',obj:SG,p:vagTop.clone(),out:V(0,1,0),inner:false,nerve:true},{id:'symp',obj:SG,p:symTop.clone(),out:V(0,1,0),inner:false,nerve:true});
     return {regions,anchors,meshes,byId,pickables,muscles,vessels,valves,condItems,nerveMeshes,nerveMat,FX,mapFor,apMeshes,
-      L:{base,apex,n,m,ant,nu,nw,triC,mitC,SA,AVN,HE,LBE,flC,triR,atrPivot,ivsC,su,sw}};
+      L:{base,apex,n,m,ant,nu,nw,triC,mitC,SA,AVN,HE,LBE,flC,triR,atrPivot,ivsC,su,sw,lm:L,hc}};
   }
 
   /* =====================================================================
@@ -836,8 +837,139 @@ function create(el,opts){
       resetPaint();
       R.condItems.forEach(ci=>ci.pulse.visible=false);
     }
-    glowFrame(performance.now()/1000);
+    glowFrame(performance.now()/1000); camStep(); txStep();
     renderer.render(scene,camera);
+  }
+
+
+  /* =====================================================================
+     Gövde (yalnız senaryolarda): omuzdan bele saydam deri, kaburgalar, sternum
+     Ölçek: 1 birim ≈ 5 cm. +x hastanın solu, +y yukarı, +z ön.
+     ===================================================================== */
+  const TOR={cx:-0.35,cz:-0.55};
+  // y, yarı genişlik, yarı derinlik, kesit köşeliliği
+  const PROF=[[-4.6,2.4,1.72,2.2],[-3.7,2.32,1.75,2.2],[-2.4,2.6,2.0,2.3],[-0.8,2.9,2.25,2.4],[0.8,3.05,2.3,2.5],[2.0,3.45,2.1,2.8],[2.8,3.7,1.75,3.0],[3.3,3.3,1.45,2.8],[3.75,2.0,1.1,2.3],[4.05,1.0,0.95,2.0],[5.0,0.85,0.85,2.0]];
+  function prof(y){
+    const P=PROF; if(y<=P[0][0]) return P[0].slice(1); if(y>=P[P.length-1][0]) return P[P.length-1].slice(1);
+    let i=0; while(P[i+1][0]<y) i++;
+    const a=P[Math.max(0,i-1)],b=P[i],c=P[i+1],d=P[Math.min(P.length-1,i+2)], t=(y-b[0])/(c[0]-b[0]);
+    const cr=(k)=>{const p0=a[k],p1=b[k],p2=c[k],p3=d[k],t2=t*t,t3=t2*t; return 0.5*((2*p1)+(-p0+p2)*t+(2*p0-5*p1+4*p2-p3)*t2+(-p0+3*p1-3*p2+p3)*t3);};
+    return [cr(1),cr(2),cr(3)];
+  }
+  function surf(y,a,k){ // a: önden açı (sağ < 0 < sol), k: yüzeye göre ölçek
+    const [rx,rz,e]=prof(y), s=Math.sin(a), c=Math.cos(a), q=2/e;
+    const x=TOR.cx+(k||1)*rx*Math.sign(s)*Math.pow(Math.abs(s),q), z=TOR.cz+(k||1)*rz*Math.sign(c)*Math.pow(Math.abs(c),q);
+    return V(x,y,z);
+  }
+  const torsoG=new T.Group(); torsoG.visible=false; BODY.add(torsoG);
+  (function buildTorso(){
+    const NY=70, NA=64, y0=-4.6, y1=5.0, pos=[], idx=[];
+    for(let j=0;j<=NY;j++){ const y=y0+(y1-y0)*j/NY; for(let i=0;i<=NA;i++){ const p=surf(y,-Math.PI+2*Math.PI*i/NA); pos.push(p.x,p.y,p.z); } }
+    for(let j=0;j<NY;j++) for(let i=0;i<NA;i++){ const a=j*(NA+1)+i,b=a+NA+1; idx.push(a,b,a+1,b,b+1,a+1); }
+    const g=new T.BufferGeometry(); g.setAttribute('position',new T.Float32BufferAttribute(pos,3)); g.setIndex(idx); g.computeVertexNormals();
+    const skin=new T.ShaderMaterial({transparent:true,depthWrite:false,side:T.DoubleSide,
+      uniforms:{uC:{value:new T.Color(0xf0b9a0)},uR:{value:new T.Color(0xffd9c4)},uA:{value:1},uY0:{value:y0},uY1:{value:y1}},
+      vertexShader:'varying vec3 vN;varying vec3 vV;varying float vY;void main(){vec4 mv=modelViewMatrix*vec4(position,1.);vN=normalize(normalMatrix*normal);vV=-mv.xyz;vY=position.y;gl_Position=projectionMatrix*mv;}',
+      fragmentShader:'uniform vec3 uC;uniform vec3 uR;uniform float uA;uniform float uY0;uniform float uY1;varying vec3 vN;varying vec3 vV;varying float vY;void main(){float f=pow(1.-abs(dot(normalize(vN),normalize(vV))),2.4);float fade=smoothstep(uY0,uY0+1.2,vY)*(1.-smoothstep(uY1-0.9,uY1,vY));gl_FragColor=vec4(mix(uC,uR,f),(0.035+0.42*f)*fade*uA);}'});
+    const m=new T.Mesh(g,skin); m.renderOrder=20; torsoG.add(m); torsoG.userData.skin=skin;
+    const bone=new T.MeshBasicMaterial({color:0xf2e8d8,transparent:true,opacity:0.13,depthWrite:false});
+    const tube=(pts,r)=>{const t=new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts),40,r,6,false),bone); t.renderOrder=19; torsoG.add(t);};
+    // kaburgalar: arkada omurgadan başlayıp öne doğru inerek sternuma yaklaşır
+    for(let r=0;r<10;r++){ const yb=2.75-r*0.56; for(const sg of [-1,1]){ const pts=[]; for(let k=0;k<=14;k++){ const u=k/14, a=sg*(Math.PI-0.22-(Math.PI-0.22-(r<7?0.32:0.75))*u), y=yb-1.0*u*u; pts.push(surf(y,a,0.9)); } tube(pts,0.045); } }
+    const st=surf(1.0,0,0.93); const sternum=new T.Mesh(new T.BoxGeometry(0.42,3.3,0.1),bone); sternum.position.set(st.x,1.0,st.z); sternum.renderOrder=19; torsoG.add(sternum);
+    for(const sg of [-1,1]) tube([surf(2.75,sg*0.12,0.95),surf(2.95,sg*0.75,0.95),surf(3.15,sg*1.25,0.95)],0.055); // köprücük kemikleri
+    const sp=[]; for(let k=0;k<=10;k++){ const y=-4.4+k*0.8; sp.push(surf(y,Math.PI,0.82)); } tube(sp,0.11);  // omurga
+  })();
+  const TORSO_VIEW={pos:V(4.4,1.4,22.5),target:V(-0.2,-0.65,0)};
+  let camAnim=null;
+  function flyTo(pos,target,dur){ camAnim={p0:camera.position.clone(),t0:controls.target.clone(),p1:pos.clone(),t1:target.clone(),s:performance.now(),d:dur||900}; }
+  function camStep(){ if(!camAnim) return; let k=(performance.now()-camAnim.s)/camAnim.d; if(k>=1){k=1;} const e=k<0.5?2*k*k:1-Math.pow(-2*k+2,2)/2; camera.position.lerpVectors(camAnim.p0,camAnim.p1,e); controls.target.lerpVectors(camAnim.t0,camAnim.t1,e); if(k>=1) camAnim=null; }
+
+  /* =====================================================================
+     Tedavi animasyonları: defibrilasyon, kardiyoversiyon, PKG, IV ilaç, vagal manevra, KPR
+     ===================================================================== */
+  const TXG=new T.Group(); BODY.add(TXG);
+  let TX=null; const shockLight=new T.PointLight(0xbfe6ff,0,30); scene.add(shockLight);
+  const tmpV=V(0,0,0);
+  function clearTX(){ while(TXG.children.length){ const o=TXG.children.pop(); o.traverse(x=>{x.geometry&&x.geometry.dispose(); x.material&&x.material.dispose&&x.material.dispose();}); } BODY.position.set(0,0,0); BODY.scale.set(1,1,1); shockLight.intensity=0; if(R){ R.nerveMat.vagus.emissiveIntensity=0.6; } TX=null; }
+  function pad(y,a){
+    const p=surf(y,a,1.01), n=p.clone().sub(V(TOR.cx,y,TOR.cz)).setY(0).normalize();
+    const g=new T.Group(); g.position.copy(p); g.lookAt(p.clone().add(n));
+    const body=new T.Mesh(new T.BoxGeometry(0.95,1.25,0.07),new T.MeshStandardMaterial({color:0xeeeeee,roughness:0.6,emissive:0xff9a2a,emissiveIntensity:0}));
+    const gel=new T.Mesh(new T.BoxGeometry(0.75,1.0,0.075),new T.MeshStandardMaterial({color:0x6a7c8a,roughness:0.4,emissive:0xffd060,emissiveIntensity:0}));
+    gel.position.z=-0.005; g.add(body,gel); g.userData={body,gel,n}; TXG.add(g); return g;
+  }
+  function bolt(a,b,mid){
+    const pts=[a]; for(let i=1;i<9;i++){ const t=i/9, p=i<5?a.clone().lerp(mid,t*2):mid.clone().lerp(b,(t-0.5)*2); p.x+=(Math.random()-0.5)*0.35; p.y+=(Math.random()-0.5)*0.35; p.z+=(Math.random()-0.5)*0.35; pts.push(p); } pts.push(b);
+    return new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts),60,0.035,6,false),new T.MeshBasicMaterial({color:0xd8f0ff,transparent:true,opacity:1,blending:T.AdditiveBlending,depthWrite:false,depthTest:false}));
+  }
+  function worldOf(id){ const a=R&&R.anchors.find(x=>x.id===id); if(!a) return null; a.obj.updateMatrixWorld(true); return a.p.clone().applyMatrix4(a.obj.matrixWorld); }
+  function treat(kind,o){
+    clearTX(); o=o||{}; const t0=performance.now();
+    TX={kind,t0,o,fired:false,d:{defib:3600,cardiovert:3200,pci:7000,iv:3600,vagal:3200,cpr:4200}[kind]||3000};
+    if(kind==='defib'||kind==='cardiovert'){ TX.a=pad(1.75,-0.62); TX.b=pad(-1.15,1.35); }
+    if(kind==='pci'&&R){
+      const k=o.vessel||'lad', occ=R.FX.occl[k]; occ.g.updateMatrixWorld(true); const end=occ.g.getWorldPosition(V(0,0,0));
+      const root=worldOf('aroot')||R.L.lm.aorta_root.clone(), arch=worldOf('arch')||root.clone().add(V(0.3,1.6,-0.4)), desc=worldOf('adesc')||arch.clone().add(V(0.6,-1.5,-0.9));
+      const ost=root.clone().lerp(end,0.25).add(R.L.ant.clone().multiplyScalar(0.25));
+      const pts=[desc.clone().add(V(0,-2.6,0)),desc,arch,root,ost,end];
+      const curve=new T.CatmullRomCurve3(pts); TX.curve=curve;
+      const cath=new T.Mesh(new T.TubeGeometry(curve,220,0.028,8,false),new T.MeshStandardMaterial({color:0xdfe7ee,roughness:0.3,metalness:0.2,emissive:0x335566,emissiveIntensity:0.35,depthTest:false,transparent:true}));
+      cath.renderOrder=30; cath.geometry.setDrawRange(0,0); TXG.add(cath); TX.cath=cath;
+      const bal=new T.Mesh(new T.SphereGeometry(1,20,14),new T.MeshStandardMaterial({color:0x7fc8ff,transparent:true,opacity:0.85,emissive:0x2a6aa0,emissiveIntensity:0.6,depthTest:false}));
+      bal.position.copy(end); bal.renderOrder=31; bal.visible=false; TXG.add(bal); TX.bal=bal; TX.tan=curve.getTangent(1); TX.occ=occ;
+      const stent=new T.Mesh(new T.CylinderGeometry(0.06,0.06,0.32,10,4,true),new T.MeshBasicMaterial({color:0xd0d8e0,wireframe:true,transparent:true,depthTest:false}));
+      stent.position.copy(end); stent.quaternion.setFromUnitVectors(V(0,1,0),TX.tan); stent.visible=false; stent.renderOrder=31; TXG.add(stent); TX.stent=stent;
+    }
+    if(kind==='iv'&&R){
+      const L=R.L.lm, svc=(L.svc_low||V(-0.94,1.2,-0.44)).clone(), tri=R.L.triC.clone(), apx=R.L.apex.clone(), pv=(L.pulv||V(0.09,0.7,0.54)).clone();
+      const arm=surf(2.6,-1.35,1.02);
+      const line=new T.CatmullRomCurve3([arm.clone().add(V(-1.2,-0.3,0)),arm,svc.clone().add(V(-0.25,1.5,0.1)),svc]);
+      const lineM=new T.Mesh(new T.TubeGeometry(line,60,0.03,6,false),new T.MeshBasicMaterial({color:0xcfe7ff,transparent:true,opacity:0.55,depthTest:false})); lineM.renderOrder=30; TXG.add(lineM);
+      const path=new T.CatmullRomCurve3([arm,svc.clone().add(V(-0.25,1.5,0.1)),svc,tri.clone().add(V(-0.35,0.05,0.1)),tri,tri.clone().lerp(apx,0.45),pv,pv.clone().add(V(0.3,0.7,-0.4))]);
+      TX.path=path; TX.dots=[];
+      const mat=new T.MeshBasicMaterial({color:o.c||0xffffff,transparent:true,opacity:1,blending:T.AdditiveBlending,depthWrite:false,depthTest:false});
+      for(let i=0;i<36;i++){ const d=new T.Mesh(new T.SphereGeometry(0.05,10,8),mat); d.renderOrder=32; d.visible=false; d.userData.off=i/36*0.45; TXG.add(d); TX.dots.push(d); }
+    }
+    if(kind==='cpr'){
+      const p=surf(-0.4,0,1.04), hand=new T.Mesh(new T.SphereGeometry(1,20,14),new T.MeshStandardMaterial({color:0xf1c6ad,transparent:true,opacity:0.85,roughness:0.7,emissive:0x5a3424,emissiveIntensity:0.8,depthTest:false}));
+      hand.scale.set(0.7,0.42,0.22); hand.position.copy(p).add(V(0,0,0.25)); TXG.add(hand); TX.hand=hand; TX.hp=hand.position.clone();
+    }
+  }
+  function txStep(){
+    if(!TX) return; const now=performance.now(), p=(now-TX.t0)/TX.d, o=TX.o;
+    const fire=()=>{ if(!TX.fired){ TX.fired=true; o.onFire&&o.onFire(); } };
+    if(TX.kind==='defib'||TX.kind==='cardiovert'){
+      const pads=[TX.a,TX.b], show=Math.min(1,p/0.15);
+      pads.forEach(g=>{ g.scale.setScalar(0.6+0.4*show); g.userData.body.material.emissiveIntensity=p>0.2&&p<0.6?0.5*(p-0.2)/0.4*(0.6+0.4*Math.sin(now/40)):0; });
+      const sh=0.6, w=0.09;
+      if(p>sh&&p<sh+w){
+        if(!TX.bolts||Math.random()<0.5){ (TX.bolts||[]).forEach(b=>{TXG.remove(b);b.geometry.dispose();}); const a=TX.a.position, b=TX.b.position, mid=R?R.L.hc.clone():V(0,0,0); TX.bolts=[bolt(a,b,mid),bolt(a,b,mid)]; TX.bolts.forEach(b=>{b.renderOrder=40;TXG.add(b);}); }
+        shockLight.position.set(0,0,3); shockLight.intensity=TX.kind==='defib'?28:14; pads.forEach(g=>g.userData.gel.material.emissiveIntensity=2.5);
+        o.onFlash&&!TX.flashed&&(TX.flashed=true,o.onFlash());
+      } else if(TX.bolts&&p>=sh+w){ TX.bolts.forEach(b=>{TXG.remove(b);b.geometry.dispose();}); TX.bolts=null; shockLight.intensity=0; pads.forEach(g=>g.userData.gel.material.emissiveIntensity=0); }
+      const j=p>sh?Math.exp(-(p-sh)*28)*Math.sin((p-sh)*90):0; BODY.position.set(0,0.12*j,0.06*j);
+      if(p>sh+0.05) fire();
+      if(p>0.9) pads.forEach(g=>g.scale.setScalar(Math.max(0.01,(1-p)*10)));
+    }
+    if(TX.kind==='pci'&&TX.cath){
+      const cnt=TX.cath.geometry.index.count, adv=Math.min(1,p/0.42), ret=p>0.78?Math.min(1,(p-0.78)/0.2):0;
+      const vis=Math.max(0,adv-ret); TX.cath.geometry.setDrawRange(0,Math.floor(vis*cnt/6)*6);
+      const inf=p>0.46&&p<0.66?Math.sin((p-0.46)/0.2*Math.PI):0;
+      TX.bal.visible=inf>0.01; const r=0.035+0.08*inf; TX.bal.scale.set(r,0.2,r); TX.bal.quaternion.setFromUnitVectors(V(0,1,0),TX.tan);
+      if(p>0.56){ TX.occ.g.visible=false; TX.stent.visible=true; fire(); }
+    }
+    if(TX.kind==='iv'&&TX.path){
+      TX.dots.forEach(d=>{ const u=(p*1.3-d.userData.off); d.visible=u>0&&u<1; if(d.visible){ TX.path.getPointAt(Math.min(1,u),tmpV); d.position.copy(tmpV); d.scale.setScalar(u>0.85?(1-u)/0.15:1); } });
+      if(p>0.62) fire();
+    }
+    if(TX.kind==='vagal'&&R){ R.nerveMat.vagus.emissiveIntensity=0.6+2.2*Math.max(0,Math.sin(now/120))*(1-Math.max(0,p-0.8)/0.2); if(p>0.7) fire(); }
+    if(TX.kind==='cpr'&&TX.hand){
+      const c=Math.max(0,Math.sin(now/1000*Math.PI*2*1.85)); BODY.scale.set(1,1,1-0.05*c); TX.hand.position.copy(TX.hp).add(V(0,0,-0.22*c));
+      if(p>0.85) TX.hand.material.opacity=0.75*(1-p)/0.15;
+      if(p>0.7) fire();
+    }
+    if(p>=1){ const done=o.onDone; clearTX(); done&&done(); }
   }
 
   Object.assign(api,{
@@ -853,6 +985,9 @@ function create(el,opts){
     setFocus(mode){ state.focus=mode||'none'; applyStatic(); },
     setOthers(v){ state.others=v; applyStatic(); },
     topOf,
+    setTorso(on,fly){ const ch=state.torso!==!!on; state.torso=!!on; torsoG.visible=!!on; if(ch&&fly!==false){ if(on) flyTo(TORSO_VIEW.pos,TORSO_VIEW.target); else flyTo(HOME.pos,HOME.target); } },
+    torsoView(){ flyTo(TORSO_VIEW.pos,TORSO_VIEW.target); },
+    treat, stopTreat(){ clearTX(); }, treating(){ return !!TX; }, _tx(){ return TX; },
     reveal(id){ // bir yapıyı göster: kamerayı ona çevir ve adını iğnele
       if(!R) return; const a=R.anchors.find(x=>x.id===id); if(!a) return;
       if(!a.inner&&!a.cond){ const d=camera.position.distanceTo(controls.target); controls.target.copy(HOME.target); camera.position.copy(HOME.target).addScaledVector(a.out,d); controls.update(); }
@@ -866,9 +1001,9 @@ function create(el,opts){
     lookFrom(dir){ if(!learn) return; const d=VA(dir).normalize(); camera.position.copy(learn.center).addScaledVector(d,11); controls.target.copy(learn.center); controls.update(); },
     leadsScreen(){ if(!learn||!LG.visible) return []; const out=[]; for(const id in learn.els){ const e=learn.els[id]; _v.copy(e.pos).project(camera); const r=renderer.domElement; out.push({id,x:(_v.x*0.5+0.5)*r.clientWidth,y:(-_v.y*0.5+0.5)*r.clientHeight,limb:e.limb}); } return out; },
     setInsets(t,l,r,b){inset.t=t;inset.l=l;inset.r=r;inset.b=b;resize();},
-    resetView(){isoFramed=null; camera.position.copy(HOME.pos); controls.target.copy(HOME.target); controls.update();},
+    resetView(){isoFramed=null; camAnim=null; if(state.torso){ camera.position.copy(TORSO_VIEW.pos); controls.target.copy(TORSO_VIEW.target); controls.update(); return; } camera.position.copy(HOME.pos); controls.target.copy(HOME.target); controls.update();},
     viewFrom(name){ // hazır açılar
-      const P={inferior:V(1.2,-7.2,5.6)}[name]; if(!P) return;
+      let P={inferior:V(1.2,-7.2,5.6)}[name]; if(!P) return; if(state.torso) P=P.clone().multiplyScalar(1.75);
       camera.position.copy(P); controls.target.copy(HOME.target); controls.update();
     }
   });

@@ -44,6 +44,26 @@ Doğrudan bir bölüme bağlantı verilebilir: `#durumlar/af`, `#durumlar/stemi_
 Klavye: 1–4 cevap, Enter sonraki soru. Skor ve en iyi seri tarayıcıda saklanır.
 Doğrudan bağlantı: `#sina/ecg`, `#sina/bul`, `#sina/bilgi`, `#sina/karisik`.
 
+## Vaka (hasta simülatörü)
+
+`#vaka` bölümünde 8 öğretici kalp vakası var (ör. ön duvar STEMI, inferior MI + sağ ventrikül, AF, SVT,
+hiperkalemi, tam AV blok, torsades, VF arrest). Her vakada hasta kartı (yaş, cinsiyet, kilo/VKİ, kronik hastalıklar,
+ilaçlar, alerjiler), şikâyet, vital bulgular ve gerekirse laboratuvar vardır. Öğrenci adım adım önce **tanıyı**,
+sonra **tedaviyi** seçer; her seçeneğin neden doğru/yanlış olduğu açıklanır.
+
+- **Seviye** vaka başlamadan seçilir: *Başlangıç* (az seçenek, ipucu kutusu açık, EKG dalgaları etiketli, yanlışta
+  yeniden dene), *Orta* (daha çok adım ve seçenek, ipucu −2 puan), *İleri* (tüm adımlar ve seçenekler, tek ipucu −3,
+  ikinci şans yok). Puan: adım başına 10, yanlış başına −4. En iyi skor tarayıcıda saklanır.
+- **Tedavi animasyonları** 3D modelde oynar ve bitince monitördeki ritim değişir: defibrilasyon/kardiyoversiyon
+  (pedler, şok, sıçrama), primer PKG (kateter, balon, stent; tıkanıklık açılır), IV ilaç (kolda damar yolu,
+  ilaç SVC → sağ kalp → pulmoner artere akar), vagal manevra (vagus parlar), KPR (göğüs basısı).
+- **Gövde:** Durumlar ve Vaka bölümlerinde kalp, omuzdan bele kadar yarı saydam bir gövdenin (kaburgalar,
+  sternum, köprücük kemikleri, omurga) içinde görünür; araç çubuğundaki **Gövde** ile kapatılabilir.
+
+Klavye: 1–9 cevap, Enter sonraki adım. Doğrudan bağlantı: `#vaka/gogus`, `#vaka/arrest`, `#vaka/svt` …
+Yeni vaka eklemek için `js/cases.js` → `CASES` dizisine bir nesne ekleyin (`cond` bir `COND` anahtarı olmalı;
+adımlar `{lv, q, o:[[metin, doğru_mu, açıklama]], h:[ipuçları], dx?, anim?:{k:'defib'|'cardiovert'|'pci'|'iv'|'vagal'|'cpr'}, next?}`).
+
 ## Parçaları incele
 
 Alttaki **Parçalar** düğmesi soldaki listeyi parça paneline çevirir. Her parça (odacıklar, septumlar, kapaklar,
@@ -73,9 +93,11 @@ js/content.js           Anatomi içerikleri: 63 yapı ve alt yapı (S, p = üst 
 js/scenarios.js         Senaryolar (COND) ve kategoriler (CATS): neden, mekanizma, EKG, klinik not
 js/lessons.js           Öğren bölümünün dersleri (LESSONS) ve Sık Sorulan Sorular (FAQ)
 js/quiz.js              Sına bölümünün çoktan seçmeli soruları (MCQ) ve EKG soru havuzu (ECG_POOL)
+js/cases.js             Vaka bölümünün hasta vakaları (CASES) ve seviyeler (LEVELS)
 js/ecg12.js             12 derivasyon modeli: derivasyon yönleri, kalp vektörü, örnek kayıtlar
 js/sim.js               Ritim zamanlayıcısı, sentetik EKG (DII/DIII/V1/V2), ileti zamanlamaları
-js/heart3d.js           GLB modeli yükler; uyarı dalgası, kasılma, ileti sistemi, duruma özel efektler
+js/heart3d.js           GLB modeli yükler; uyarı dalgası, kasılma, ileti sistemi, duruma özel efektler,
+                        gövde ve tedavi animasyonları
 js/app.js               Arayüz, mod geçişi (#anatomi / #durumlar / #ogren / #sina), EKG ve 12 derivasyon çizimi
 assets/heart.glb        Kalp modeli (19 parça: odacıklar, septumlar, kapaklar, koronerler, büyük damarlar)
 assets/heart.landmarks.json  Modelden çıkarılan referans noktaları (tepe, taban, kapak merkezleri…)
