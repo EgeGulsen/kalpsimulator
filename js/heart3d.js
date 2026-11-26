@@ -351,7 +351,7 @@ function create(el,opts){
 
     /* --- Malzemeler (ileti, sinir) --- */
     const condMat=()=>new T.MeshStandardMaterial({color:0xffd60a,emissive:0xffb400,emissiveIntensity:0.6,roughness:0.35});
-    const pulseMat=()=>new T.MeshBasicMaterial({color:0xffc800,transparent:true,opacity:1,blending:T.AdditiveBlending,depthWrite:false});
+    const pulseMat=()=>new T.MeshBasicMaterial({color:0xffb400,transparent:true,opacity:1,blending:T.NormalBlending,depthWrite:false});
     const hitMat=new T.MeshBasicMaterial({colorWrite:false,depthWrite:false,transparent:true,opacity:0});
     const condItems=[], nerveMeshes=[];
     const CG=new T.Group(), CV=new T.Group(); AG.add(CG); VG.add(CV);
@@ -434,7 +434,7 @@ function create(el,opts){
 
     /* --- Duruma özel efektler --- */
     const FX={};
-    const glow=(hex,op)=>new T.MeshBasicMaterial({color:hex,transparent:true,opacity:op==null?1:op,blending:T.AdditiveBlending,depthWrite:false});
+    const glow=(hex,op)=>new T.MeshBasicMaterial({color:hex,transparent:true,opacity:op==null?1:op,blending:T.NormalBlending,depthWrite:false});
     const xMat=new T.MeshBasicMaterial({color:0xff4d4d,depthTest:false,transparent:true});
     function blockX(pos,parent){
       const g=new T.Group(); g.position.copy(pos);
@@ -450,22 +450,22 @@ function create(el,opts){
     const ringPt=a=>flC.clone().addScaledVector(nu,triR*Math.cos(a)).addScaledVector(nw,triR*Math.sin(a));
     const ringCurve=new T.CatmullRomCurve3(Array.from({length:48},(_,i)=>ringPt(i/48*Math.PI*2)),true);
     FX.flLoop=new T.Mesh(new T.TubeGeometry(ringCurve,96,0.03,8,true),condMat()); FX.flLoop.renderOrder=2; CG.add(FX.flLoop);
-    FX.flDots=Array.from({length:7},(_,i)=>{const s=new T.Mesh(new T.SphereGeometry(0.09-i*0.009,12,8),glow(0xfff08a,1-i*0.13)); s.renderOrder=4; CG.add(s); return s;});
+    FX.flDots=Array.from({length:7},(_,i)=>{const s=new T.Mesh(new T.SphereGeometry(0.09-i*0.009,12,8),glow(0xffbf00,1-i*0.13)); s.renderOrder=4; CG.add(s); return s;});
     // AVNRT: AV düğüm çevresinde küçük devre
-    FX.svtDots=Array.from({length:5},(_,i)=>{const s=new T.Mesh(new T.SphereGeometry(0.06-i*0.008,12,8),glow(0xfff08a,1-i*0.17)); s.renderOrder=4; CG.add(s); return s;});
+    FX.svtDots=Array.from({length:5},(_,i)=>{const s=new T.Mesh(new T.SphereGeometry(0.06-i*0.008,12,8),glow(0xffbf00,1-i*0.17)); s.renderOrder=4; CG.add(s); return s;});
     const [su,sw]=perp(m);
     // AF: pulmoner ven ağızlarında ektopik kıvılcımlar
     const pvPts=[]; {const a=geos.pvn.attributes.position.array; const cand=[]; for(let i=0;i<a.length;i+=3){const p=V(a[i],a[i+1],a[i+2]); cand.push([p.distanceTo(laC),p]);} cand.sort((x,y)=>x[0]-y[0]); for(const [,p] of cand){ if(pvPts.every(q=>q.distanceTo(p)>0.45)) pvPts.push(p); if(pvPts.length>=4) break; }}
-    FX.pvSparks=pvPts.map(p=>{const s=new T.Mesh(new T.SphereGeometry(0.07,12,8),glow(0xffc21a)); s.position.copy(p); s.renderOrder=4; CG.add(s); return s;});
+    FX.pvSparks=pvPts.map(p=>{const s=new T.Mesh(new T.SphereGeometry(0.07,12,8),glow(0xff9f0a)); s.position.copy(p); s.renderOrder=4; CG.add(s); return s;});
     // Ektopik odak işaretleri
-    function focusMarker(p,parent){const g=new T.Group(); g.position.copy(p); const core=new T.Mesh(new T.SphereGeometry(0.07,16,12),glow(0xfff2a0)); const halo=new T.Mesh(new T.SphereGeometry(0.16,16,12),glow(0xffb000,0.5)); g.add(core,halo); g.renderOrder=5; parent.add(g); g.visible=false; return {g,core,halo};}
+    function focusMarker(p,parent){const g=new T.Group(); g.position.copy(p); const core=new T.Mesh(new T.SphereGeometry(0.07,16,12),glow(0xffa800)); const halo=new T.Mesh(new T.SphereGeometry(0.16,16,12),glow(0xff8a00,0.35)); g.add(core,halo); g.renderOrder=5; parent.add(g); g.visible=false; return {g,core,halo};}
     FX.pvc=focusMarker(pvcFocus,CV); FX.vt=focusMarker(vtFocus,CV);
     // Kalp pili kablosu (SVC → sağ atriyum → triküspit → sağ ventrikül tepesi)
     const svcTop=nearest(['svc'],V(-0.95,2.3,-0.15));
     const leadCurve=new T.CatmullRomCurve3([svcTop.clone().add(V(0,0.4,0)),svcTop,L.svc_low||raC,raC.clone().lerp(triC,0.5),triC,rvAx(0.5),rvApexEndo]);
     FX.lead=new T.Group();
     FX.lead.add(new T.Mesh(new T.TubeGeometry(leadCurve,160,0.028,10,false),new T.MeshStandardMaterial({color:0xcfd6dc,metalness:0.8,roughness:0.3})));
-    FX.leadTip=new T.Mesh(new T.SphereGeometry(0.06,16,12),glow(0xffffff)); FX.leadTip.position.copy(rvApexEndo); FX.lead.add(FX.leadTip);
+    FX.leadTip=new T.Mesh(new T.SphereGeometry(0.06,16,12),glow(0xffc400)); FX.leadTip.position.copy(rvApexEndo); FX.lead.add(FX.leadTip);
     FX.lead.visible=false; SG.add(FX.lead);
     // Enfarktüs tıkanma noktaları
     FX.occl={};
@@ -901,7 +901,7 @@ function create(el,opts){
   }
   function bolt(a,b,mid){
     const pts=[a]; for(let i=1;i<9;i++){ const t=i/9, p=i<5?a.clone().lerp(mid,t*2):mid.clone().lerp(b,(t-0.5)*2); p.x+=(Math.random()-0.5)*0.35; p.y+=(Math.random()-0.5)*0.35; p.z+=(Math.random()-0.5)*0.35; pts.push(p); } pts.push(b);
-    return new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts),60,0.035,6,false),new T.MeshBasicMaterial({color:0xd8f0ff,transparent:true,opacity:1,blending:T.AdditiveBlending,depthWrite:false,depthTest:false}));
+    return new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts),60,0.035,6,false),new T.MeshBasicMaterial({color:0x2f7bff,transparent:true,opacity:1,blending:T.NormalBlending,depthWrite:false,depthTest:false}));
   }
   function worldOf(id){ const a=R&&R.anchors.find(x=>x.id===id); if(!a) return null; a.obj.updateMatrixWorld(true); return a.p.clone().applyMatrix4(a.obj.matrixWorld); }
   function treat(kind,o){
@@ -914,7 +914,7 @@ function create(el,opts){
       const ost=root.clone().lerp(end,0.25).add(R.L.ant.clone().multiplyScalar(0.25));
       const pts=[desc.clone().add(V(0,-2.6,0)),desc,arch,root,ost,end];
       const curve=new T.CatmullRomCurve3(pts); TX.curve=curve;
-      const cath=new T.Mesh(new T.TubeGeometry(curve,220,0.028,8,false),new T.MeshStandardMaterial({color:0xdfe7ee,roughness:0.3,metalness:0.2,emissive:0x335566,emissiveIntensity:0.35,depthTest:false,transparent:true}));
+      const cath=new T.Mesh(new T.TubeGeometry(curve,220,0.028,8,false),new T.MeshStandardMaterial({color:0x7d8b9c,roughness:0.3,metalness:0.2,emissive:0x1c2b3a,emissiveIntensity:0.3,depthTest:false,transparent:true}));
       cath.renderOrder=30; cath.geometry.setDrawRange(0,0); TXG.add(cath); TX.cath=cath;
       const bal=new T.Mesh(new T.SphereGeometry(1,20,14),new T.MeshStandardMaterial({color:0x7fc8ff,transparent:true,opacity:0.85,emissive:0x2a6aa0,emissiveIntensity:0.6,depthTest:false}));
       bal.position.copy(end); bal.renderOrder=31; bal.visible=false; TXG.add(bal); TX.bal=bal; TX.tan=curve.getTangent(1); TX.occ=occ;
@@ -925,10 +925,10 @@ function create(el,opts){
       const L=R.L.lm, svc=(L.svc_low||V(-0.94,1.2,-0.44)).clone(), tri=R.L.triC.clone(), apx=R.L.apex.clone(), pv=(L.pulv||V(0.09,0.7,0.54)).clone();
       const arm=surf(2.6,-1.35,1.02);
       const line=new T.CatmullRomCurve3([arm.clone().add(V(-1.2,-0.3,0)),arm,svc.clone().add(V(-0.25,1.5,0.1)),svc]);
-      const lineM=new T.Mesh(new T.TubeGeometry(line,60,0.03,6,false),new T.MeshBasicMaterial({color:0xcfe7ff,transparent:true,opacity:0.55,depthTest:false})); lineM.renderOrder=30; TXG.add(lineM);
+      const lineM=new T.Mesh(new T.TubeGeometry(line,60,0.03,6,false),new T.MeshBasicMaterial({color:0x5b86c9,transparent:true,opacity:0.75,depthTest:false})); lineM.renderOrder=30; TXG.add(lineM);
       const path=new T.CatmullRomCurve3([arm,svc.clone().add(V(-0.25,1.5,0.1)),svc,tri.clone().add(V(-0.35,0.05,0.1)),tri,tri.clone().lerp(apx,0.45),pv,pv.clone().add(V(0.3,0.7,-0.4))]);
       TX.path=path; TX.dots=[];
-      const mat=new T.MeshBasicMaterial({color:o.c||0xffffff,transparent:true,opacity:1,blending:T.AdditiveBlending,depthWrite:false,depthTest:false});
+      const mat=new T.MeshBasicMaterial({color:o.c||0x2f7bff,transparent:true,opacity:1,blending:T.NormalBlending,depthWrite:false,depthTest:false});
       for(let i=0;i<36;i++){ const d=new T.Mesh(new T.SphereGeometry(0.05,10,8),mat); d.renderOrder=32; d.visible=false; d.userData.off=i/36*0.45; TXG.add(d); TX.dots.push(d); }
     }
     if(kind==='cpr'){
