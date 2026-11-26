@@ -17,6 +17,7 @@ const packs=[], dict=new Map(), rules=[];
 function merge(t,s){
   for(const k of Object.keys(s)){
     const v=s[k];
+    if(k.endsWith('+')&&Array.isArray(v)){ const b=k.slice(0,-1); t[b]=(Array.isArray(t[b])?t[b]:[]).concat(v); continue; } // 'X+': listeye ekle
     if(v&&typeof v==='object'&&!Array.isArray(v)&&typeof v!=='function'){
       if(v.$replace){ const c=Object.assign({},v); delete c.$replace; t[k]=c; continue; }
       if(!t[k]||typeof t[k]!=='object'||Array.isArray(t[k])) t[k]={};
@@ -89,6 +90,6 @@ const I={
 };
 window.KalpI18n=I;
 /* İngilizce paketleri yalnız gerektiğinde yükle (betik bu noktaya, sırayla eklenir) */
-if(lang==='en') for(const f of ['en-content','en-scenarios','en-lessons','en-quiz','en-cases','en-patients','en-ui'])
+if(lang==='en') for(const f of ['en-content','en-scenarios','en-lessons','en-quiz','en-cases','en-cases2','en-patients','en-ui'])
   document.write('<script src="js/'+f+'.js"><\/script>');
 })();
