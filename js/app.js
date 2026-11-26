@@ -20,13 +20,13 @@ const stage=$('stage'), tip=$('tip'), loading=$('loading'), xray=$('t-xray'), tL
 try{
   heart=window.KalpHeart.create(stage,{
     modelUrl:['assets/heart.glb','assets/heart.b64.txt'],
-    onPick:id=>{ if(mode==='sina'&&quizPick(id)) return; if(id) openCard(); select(id); },
+    onPick:id=>{ if(mode==='ana') return; if(mode==='sina'&&quizPick(id)) return; if(id) openCard(); select(id); },
     onHover:(id,x,y)=>{
       if(!id||quizHidesNames()){tip.hidden=true;return;}
       const r=stage.getBoundingClientRect();
       tip.textContent=S[id]?S[id].n:id; tip.hidden=false; tip.style.left=(x-r.left)+'px'; tip.style.top=(y-r.top)+'px';
     },
-    onReady:()=>{loading.hidden=true; if(partsOpen){heart.setFocus(focusMode); renderParts();} heart.setTorso(torsoWanted()); if(mode==='ogren'){applyLearn3D();} else if(mode==='sina'){applyQ3D();} else if(mode==='vaka'){applyV3D();} else heart.setMode(mode,mode==='durumlar'?COND[condKey]:null,condKey); heart.setXray(xray.checked); heart.select(selected); insets(); if(mode==='durumlar'&&(COND[condKey].fx||{}).infarct==='rca'){heart.viewFrom('inferior'); lastView=true;}},
+    onReady:()=>{loading.hidden=true; if(partsOpen){heart.setFocus(focusMode); renderParts();} heart.setTorso(torsoWanted()); if(mode==='ana'){applyHome3D();} else if(mode==='ogren'){applyLearn3D();} else if(mode==='sina'){applyQ3D();} else if(mode==='vaka'){applyV3D();} else heart.setMode(mode,mode==='durumlar'?COND[condKey]:null,condKey); heart.setXray(xray.checked); heart.select(selected); insets(); if(mode==='durumlar'&&(COND[condKey].fx||{}).infarct==='rca'){heart.viewFrom('inferior'); lastView=true;}},
     onError:()=>{loading.innerHTML='3D model yüklenemedi. Dosyayı doğrudan açtıysan bir yerel sunucu ile aç<br>(ör. <code>python3 -m http.server</code>).';}
   });
   stage.insertBefore(heart.canvas,stage.firstChild);
@@ -80,6 +80,7 @@ function navConds(){
 }
 function renderNav(){
   const ae=document.activeElement&&document.activeElement.id==='search', pos=ae?$('search').selectionStart:0;
+  if(mode==='ana'){ nav.innerHTML=''; return; }
   nav.innerHTML= mode==='anatomi'?navAnatomy():mode==='ogren'?navLearn():mode==='sina'?navQuiz():mode==='vaka'?navVaka():navConds();
   if(ae){const s=$('search'); s.focus(); s.setSelectionRange(pos,pos);}
 }
@@ -171,6 +172,7 @@ function condHTML(){
 }
 let bA=null,bV=null;
 function render(){
+  if(mode==='ana'){ renderHome(); return; }
   card.innerHTML = mode==='anatomi'?anatomyHTML():mode==='ogren'?learnHTML():mode==='sina'?quizHTML():mode==='vaka'?vakaHTML():condHTML();
   bA=$('bA'); bV=$('bV');
   card.classList.toggle('hide',!cardOpen);
@@ -412,11 +414,18 @@ document.querySelectorAll('[data-speed]').forEach(b=>b.addEventListener('click',
 function setMode(m){
   const prev=mode; mode=m; document.body.classList.remove('qtext'); document.body.dataset.mode=m;
   ['anatomi','durumlar','ogren','sina','vaka'].forEach(k=>{const a=$('tab-'+k); if(k===m)a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current');});
+  if(m==='ana') $('brand').setAttribute('aria-current','page'); else $('brand').removeAttribute('aria-current');
+  $('home').hidden=m!=='ana'; heart&&heart.setSpin&&heart.setSpin(m==='ana'&&!reduce);
+  if(m!=='ana') try{ localStorage.setItem('kalp.last',location.hash||'#'+m); }catch(e){}
   const live=m==='durumlar', learnM=m==='ogren';
   document.body.classList.toggle('live',live||learnM);
   heart&&heart.setLearn(learnM,E12.LEADS);
   if(!learnM) e12.classList.remove('show');
-  if(learnM){
+  if(m==='ana'){
+    e12.classList.remove('show'); monitor.classList.remove('show','swap'); selected=null;
+    lastView=false;
+    applyHome3D(); renderHome(); renderNav();
+  } else if(learnM){
     monitor.classList.remove('show','swap'); if(lastView&&heart){heart.resetView(); lastView=false;}
     selected=null; if(prev!=='ogren'||!sim.vent.length){ sim.setCondition('nsr'); xray.checked=true; } applyLearn3D();
     requestAnimationFrame(()=>{e12.classList.add('show'); setTimeout(()=>{size12(); insets();},650);});
@@ -448,7 +457,8 @@ function fromHash(){
   else if(h[0]==='vaka'){ setMode('vaka'); if(h[1]&&CASES.some(c=>c.id===h[1])&&h[1]!==vk.id) startCase(h[1]); }
   else if(h[0]==='sina'){ if(h[1]&&['karisik','ecg','bul','bilgi'].includes(h[1])&&h[1]!==quiz.type){quiz.type=h[1]; quiz.cur=null;} setMode('sina'); }
   else if(h[0]==='ogren'){ if(h[1]&&(h[1]==='sss'||LESSONS.some(l=>l.id===h[1]))) lesson=h[1]; setMode('ogren'); }
-  else setMode('anatomi');
+  else if(h[0]==='anatomi') setMode('anatomi');
+  else setMode('ana');
 }
 window.addEventListener('hashchange',fromHash);
 
@@ -702,6 +712,57 @@ document.addEventListener('keydown',e=>{
   else if(e.key==='Enter'&&r.done&&!vk.busy&&!e.target.closest('button,a')){ vkNext(); e.preventDefault(); }
 });
 
+/* ---------- Ana sayfa ---------- */
+function applyHome3D(){
+  if(mode!=='ana') return;
+  if(sim.key!=='nsr') sim.setCondition('nsr');
+  if(!heart||!heart.ready) return;
+  heart.setMode('durumlar',COND.nsr,'nsr'); heart.setXray(false); heart.setTorso(false); heart.select(null); heart.resetView(); heart.dolly(1.3); heart.setSpin(!reduce); insets();
+}
+function renderHome(){
+  const el=$('home'); if(!el) return;
+  const icon=k=>{const a=$('tab-'+k); const sv=a&&a.querySelector('svg'); return sv?sv.outerHTML:'';};
+  const tot=Object.values(quiz.score).reduce((a,s)=>[a[0]+s[0],a[1]+s[1]],[0,0]);
+  const doneCases=CASES.filter(c=>vk.best[c.id]&&Object.keys(vk.best[c.id]).length).length;
+  const bar=(n,d,txt)=>`<div class="prog"><span>${txt}</span><div class="bar"><i style="width:${d?Math.round(100*n/d):0}%"></i></div></div>`;
+  const cnt=k=>k==='a'?Object.keys(S):k==='d'?Object.keys(COND):LESSONS.map(l=>l.id);
+  const sn=k=>cnt(k).filter(id=>isSeen(k,id)).length;
+  const tiles=[
+    ['anatomi','Anatomi',`${Object.keys(S).length} yapı: odacıklar, koronerler, ileti sistemi, sinirler`,bar(sn('a'),Object.keys(S).length,`${sn('a')}/${Object.keys(S).length} incelendi`)],
+    ['durumlar','Durumlar',`${Object.keys(COND).length} ritim ve klinik tablo, canlı EKG ile`,bar(sn('d'),Object.keys(COND).length,`${sn('d')}/${Object.keys(COND).length} çalışıldı`)],
+    ['ogren','EKG dersleri',`${LESSONS.length} ders ve 12 derivasyonlu canlı EKG`,bar(sn('l'),LESSONS.length,`${sn('l')}/${LESSONS.length} tamamlandı`)],
+    ['vaka','Vakalar',`${CASES.length} hasta: tanı koy, tedaviyi seç`,bar(doneCases,CASES.length,`${doneCases}/${CASES.length} vaka bitti`)],
+    ['sina','Sına','EKG’den tanı, kalpte bul, çoktan seçmeli',bar(tot[0],tot[1],tot[1]?`%${Math.round(100*tot[0]/tot[1])} doğru (${tot[1]} soru)`:'Henüz soru çözülmedi')]];
+  let last='#anatomi'; try{ last=localStorage.getItem('kalp.last')||last; }catch(e){}
+  const lastM=last.replace('#','').split('/')[0], lastN={anatomi:'Anatomi',durumlar:'Durumlar',ogren:'EKG dersleri',vaka:'Vakalar',sina:'Sına'}[lastM]||'Anatomi';
+  const started=sn('a')+sn('d')+sn('l')+tot[1]+doneCases>0;
+  el.innerHTML=`<div class="hhero"><div class="eyebrow">Tıp öğrencileri için 3D kalp atlası</div><h1>Kalbi katman katman öğren</h1>
+    <p>Gerçek bir insan kalbi modelinde anatomiyi incele, ritim bozukluklarını EKG ile izle, hasta vakalarını yönet.</p>
+    <div class="streak">${FLAME}<span><b>${streak}</b> gün üst üste</span></div>
+    <a class="bigbtn" href="${esc(started?last:'#anatomi')}">${started?`Kaldığın yerden devam et<small>${esc(lastN)}</small>`:'Anatomiden başla'}</a></div>
+    <nav class="htiles" aria-label="Bölümler">${tiles.map(([k,t,d,b])=>`<a class="htile" href="#${k}"><i aria-hidden="true">${icon(k)}</i><b>${esc(t)}</b><span>${esc(d)}</span>${b}</a>`).join('')}</nav>`;
+}
+
+/* ---------- Tema: açık / koyu, dairesel geçişle ---------- */
+const root=document.documentElement, darkMQ=window.matchMedia('(prefers-color-scheme: dark)');
+const isDark=()=>root.dataset.theme?root.dataset.theme==='dark':darkMQ.matches;
+function themeColors(){
+  ECG=cssv('--ecg-ink')||ECG; PAPER=cssv('--ecg-paper')||PAPER; GRID=cssv('--ecg-minor')||GRID; GRID2=cssv('--ecg-major')||GRID2; MUTED=cssv('--ecg-label')||MUTED;
+  OFF=isDark()?[44,55,72]:[229,220,221];
+  document.querySelectorAll('.themebtn').forEach(b=>b.setAttribute('aria-pressed',isDark()));
+}
+function setTheme(next){ root.dataset.theme=next; try{ localStorage.setItem('kalp.theme',next); }catch(e){} themeColors(); }
+function toggleTheme(e){
+  const next=isDark()?'light':'dark';
+  if(!document.startViewTransition||reduce){ setTheme(next); return; }
+  const r=e.currentTarget.getBoundingClientRect(), x=r.left+r.width/2, y=r.top+r.height/2;
+  const R=Math.hypot(Math.max(x,innerWidth-x),Math.max(y,innerHeight-y));
+  const tr=document.startViewTransition(()=>setTheme(next));
+  tr.ready.then(()=>root.animate({clipPath:[`circle(0px at ${x}px ${y}px)`,`circle(${R}px at ${x}px ${y}px)`]},{duration:650,easing:'cubic-bezier(.4,0,.2,1)',pseudoElement:'::view-transition-new(root)'})).catch(()=>{});
+}
+document.querySelectorAll('.themebtn').forEach(b=>b.addEventListener('click',toggleTheme));
+darkMQ.addEventListener&&darkMQ.addEventListener('change',()=>{ if(!root.dataset.theme) themeColors(); });
+
 /* Hakkında */
 $('srcList').innerHTML=(SOURCES||[]).map(([t,u])=>`<li><a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a></li>`).join('');
 const openAbout=()=>{const d=$('about'); d.showModal?d.showModal():d.setAttribute('open','');};
@@ -710,7 +771,7 @@ $('btnAbout').addEventListener('click',openAbout); $('btnAbout2').addEventListen
 /* ---------- EKG ---------- */
 const cv=$('ecg'), ctx=cv.getContext('2d');
 const css=getComputedStyle(document.documentElement), cssv=n=>css.getPropertyValue(n).trim();
-const ECG=cssv('--ecg-ink')||'#17171b', PAPER=cssv('--ecg-paper')||'#fff8f7', GRID=cssv('--ecg-minor')||'#f8dada', GRID2=cssv('--ecg-major')||'#eba9ab', MUTED=cssv('--ecg-label')||'#9a4b50';
+let ECG=cssv('--ecg-ink')||'#17171b', PAPER=cssv('--ecg-paper')||'#fff8f7', GRID=cssv('--ecg-minor')||'#f8dada', GRID2=cssv('--ecg-major')||'#eba9ab', MUTED=cssv('--ecg-label')||'#9a4b50';
 function sizeCanvas(){const r=cv.getBoundingClientRect(), d=Math.min(2,window.devicePixelRatio||1); if(!r.width||!r.height)return; cv.width=Math.round(r.width*d); cv.height=Math.round(r.height*d); ctx.setTransform(d,0,0,d,0,0);}
 function drawECG(){
   const W=cv.clientWidth, H=cv.clientHeight; if(!W) return;
@@ -747,7 +808,7 @@ function drawECG(){
 
 /* ---------- Döngü ---------- */
 let last=0, hrTick=0;
-const RED=[214,40,52], AF=[224,122,31], OFF=[229,220,221];
+const RED=[214,40,52], AF=[224,122,31]; let OFF=[229,220,221]; themeColors();
 const mix=(a,b,k)=>`rgb(${a.map((v,i)=>Math.round(v+(b[i]-v)*k)).join(',')})`;
 function loop(ts){
   requestAnimationFrame(loop);
@@ -765,11 +826,12 @@ function loop(ts){
     sim.step(dt); if(cv.width<10) sizeCanvas(); drawECG();
     if(ts-hrTick>500){hrTick=ts; const hr=sim.heartRate(), v=COND[quiz.cur.key].r.vent; $('hrv').textContent= v==='vf'?'—':hr==null?'--':hr;}
   }
+  if(mode==='ana') sim.step(dt);
   if(mode==='ogren'){
     sim.step(dt); if(c12.width<10) size12(); draw12();
     heart&&heart.setVector(vecAt(sim.t));
   }
-  heart&&heart.frame(mode==='durumlar'||mode==='ogren'||mode==='vaka'||(mode==='sina'&&quiz.cur&&quiz.cur.t==='ecg'&&quiz.cur.done)?sim:null);
+  heart&&heart.frame(mode==='ana'||mode==='durumlar'||mode==='ogren'||mode==='vaka'||(mode==='sina'&&quiz.cur&&quiz.cur.t==='ecg'&&quiz.cur.done)?sim:null);
   drawLabels();
 }
 window.__kalp={sim,get heart(){return heart;},get vk(){return vk;}};

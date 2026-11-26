@@ -1000,6 +1000,8 @@ function create(el,opts){
     setVector(v){ learnVector(v); },
     lookFrom(dir){ if(!learn) return; const d=VA(dir).normalize(); camera.position.copy(learn.center).addScaledVector(d,11); controls.target.copy(learn.center); controls.update(); },
     leadsScreen(){ if(!learn||!LG.visible) return []; const out=[]; for(const id in learn.els){ const e=learn.els[id]; _v.copy(e.pos).project(camera); const r=renderer.domElement; out.push({id,x:(_v.x*0.5+0.5)*r.clientWidth,y:(-_v.y*0.5+0.5)*r.clientHeight,limb:e.limb}); } return out; },
+    dolly(k){ camera.position.sub(controls.target).multiplyScalar(k).add(controls.target); controls.update(); },
+    setSpin(on){ controls.autoRotate=!!on; controls.autoRotateSpeed=1.1; },
     setInsets(t,l,r,b){inset.t=t;inset.l=l;inset.r=r;inset.b=b;resize();},
     resetView(){isoFramed=null; camAnim=null; if(state.torso){ camera.position.copy(TORSO_VIEW.pos); controls.target.copy(TORSO_VIEW.target); controls.update(); return; } camera.position.copy(HOME.pos); controls.target.copy(HOME.target); controls.update();},
     viewFrom(name){ // hazır açılar
