@@ -557,13 +557,18 @@ function create(el,opts){
     return null;
   }
   function partState(id){ return state.parts[id]||{vis:true,op:1}; }
+  const GHOST=0.13; // "odaklansın": seçilen yapı dışındaki her şeyin saydamlığı
   function applyParts(){
     const top=topOf(state.selected), f=top?state.focus:'none';
+    const sub=f==='ghost'&&top&&state.selected!==top; // seçilen, bir parçanın alt bölgesi (ör. RVOT, LAD'ın diyagonal dalı)
     for(const id in R.byId){
       if(id==='ap') continue;
       const ps=partState(id), me=id===top;
       const show=f==='iso'?me:ps.vis;
-      const op=ps.op*(state.dim[id]==null||me?1:state.dim[id])*(f!=='none'&&!me?state.others:1);
+      const ghost=f==='ghost'&&(!me||sub);
+      let op=ps.op*(state.dim[id]==null||me?1:state.dim[id])*(f!=='none'&&f!=='ghost'&&!me?state.others:1);
+      if(ghost) op=Math.max(0.03,Math.min(op,GHOST));
+      const solid=f==='ghost'&&me&&!sub&&ps.op>=0.999; // seçilen yapı saydam olmaz
       const seen=new Set(), kind=R.byId[id].kind;
       for(const mesh of R.byId[id].meshes){
         const baseVis=(kind==='kas'||kind==='kapak')?true:mesh.visible; // diğerlerinin görünürlüğünü katmanlar belirler
@@ -571,19 +576,57 @@ function create(el,opts){
         const m=mesh.material; if(seen.has(m)) continue; seen.add(m);
         const o=m.userData.orig||(m.userData.orig={t:m.transparent,o:m.opacity,d:m.depthWrite});
         if(kind==='ileti'||kind==='sinir'){ m.transparent=o.t; m.opacity=o.o; m.depthWrite=o.d; }
-        if(op<0.999&&mesh.visible){
+        if(solid&&kind!=='ileti'&&kind!=='sinir'){ m.transparent=false; m.opacity=1; m.depthWrite=true; m.side=T.DoubleSide; m.needsUpdate=true; }
+        else if(op<0.999&&mesh.visible){
           const base=m.transparent?m.opacity:1;
-          m.transparent=true; m.opacity=base*op; m.depthWrite=false; m.needsUpdate=true;
+          m.transparent=true; m.opacity=ghost?op:base*op; m.depthWrite=false; if(ghost&&kind==='kas') m.side=T.FrontSide; m.needsUpdate=true;
         }
       }
     }
+    focusOverlay(sub?state.selected:null,top);
     // tıklama hedefleri gizli parçaları seçmesin
     R.pickables.forEach(pk=>{const id=pk.userData.id; if(!id||id==='ap'||pk.material.colorWrite!==false) return;
       const ps=partState(id), k=pk.userData.kind, layer=k==='sinir'?state.layers.nerves:k==='ileti'?state.layers.cond:true;
       pk.visible=layer&&(f==='iso'?id===top:ps.vis);});
     glowReset();
     frameIso();
+    frameGhost();
   }
+  /* Alt bölge seçilince (ör. RVOT) o bölgenin üçgenlerinden opak bir kopya: parça saydamken bölge dolu görünür */
+  let ovl=null, ovlKey=null;
+  function focusOverlay(sel,top){
+    const key=sel?sel+'@'+top:null;
+    if(key===ovlKey) return;
+    if(ovl){ ovl.parent&&ovl.parent.remove(ovl); ovl.geometry.dispose(); ovl.material.dispose(); ovl=null; }
+    ovlKey=key; if(!sel) return;
+    const rg=R.regions[top], k=rg?rg.names.indexOf(sel):-1, host=R.byId[top]&&R.byId[top].meshes[0]; if(k<0||!host) return;
+    const g=host.geometry, idx=g.index?g.index.array:null, nt=idx?idx.length:g.attributes.position.count, out=[];
+    for(let t=0;t<nt;t+=3){ const a=idx?idx[t]:t, b=idx?idx[t+1]:t+1, c=idx?idx[t+2]:t+2; if(rg.reg[a]===k&&rg.reg[b]===k&&rg.reg[c]===k) out.push(a,b,c); }
+    if(!out.length) return;
+    const ng=new T.BufferGeometry(); for(const n in g.attributes) ng.setAttribute(n,g.attributes[n]); ng.setIndex(out);
+    const mat=host.material.clone(); mat.transparent=false; mat.opacity=1; mat.depthWrite=true; mat.side=T.DoubleSide;
+    mat.polygonOffset=true; mat.polygonOffsetFactor=-1; mat.polygonOffsetUnits=-1; mat.userData={};
+    ovl=new T.Mesh(ng,mat); ovl.raycast=()=>{}; host.add(ovl);
+  }
+  /* "Odaklansın": kamerayı seçilen yapıya yumuşakça çevir ve yaklaştır; seçim kalkınca geri dön */
+  let ghostFramed=null;
+  function frameGhost(){
+    const top=topOf(state.selected);
+    if(state.focus!=='ghost'||!top){
+      if(ghostFramed){ ghostFramed=null; const v=state.torso?TORSO_VIEW:HOME; flyTo(v.pos,v.target,800); }
+      return;
+    }
+    if(ghostFramed===state.selected) return; ghostFramed=state.selected;
+    const box=new T.Box3();
+    if(ovl&&ovl.parent){ ovl.updateWorldMatrix(true,false); ng0(ovl); box.copy(ovl.geometry.boundingBox).applyMatrix4(ovl.matrixWorld); }
+    else R.byId[top].meshes.forEach(m=>box.expandByObject(m));
+    if(box.isEmpty()) return;
+    const c=box.getCenter(V(0,0,0)), r=box.getSize(V(0,0,0)).length()*0.5;
+    const dir=camera.position.clone().sub(controls.target).normalize(), cur=camera.position.distanceTo(controls.target);
+    const d=Math.min(Math.max(cur,6),Math.max(6,r*3.8));
+    flyTo(c.clone().addScaledVector(dir,d),c,850);
+  }
+  function ng0(m){ if(!m.geometry.boundingBox) m.geometry.computeBoundingBox(); }
   let isoFramed=null;
   function frameIso(){ // "yalnız o kalsın": kamerayı seçilen parçaya yaklaştır
     const top=topOf(state.selected);
@@ -685,11 +728,12 @@ function create(el,opts){
       let p=a.obj; let vis=true; while(p){ if(!p.visible){vis=false;break;} p=p.parent; }
       if(!vis) continue;
       if(a.cond&&(!state.xray||!state.layers.cond)) continue;
-      if(a.inner&&!a.cond&&!state.xray) continue;
+      const foc=state.focus==='ghost'&&a.id===state.selected; // odaktaki yapının adı içeride/arkada olsa da görünsün
+      if(a.inner&&!a.cond&&!state.xray&&!foc) continue;
       if(a.nerve&&!state.layers.nerves) continue;
       _c.copy(a.p).applyMatrix4(a.obj.matrixWorld); _o.copy(camera.position).sub(_c).normalize();
       const facing=a.inner||a.nerve?1:a.out.dot(_o);
-      if(facing<-0.05&&!state.xray) continue;
+      if(facing<-0.05&&!state.xray&&!foc) continue;
       const sc=toScreen(a.obj,a.p); if(!sc.on) continue;
       list.push({id:a.id,x:sc.x,y:sc.y,depth:sc.depth,dim:facing<-0.05});
     }

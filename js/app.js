@@ -28,7 +28,7 @@ try{
       const r=stage.getBoundingClientRect();
       tip.textContent=S[id]?S[id].n:id; tip.hidden=false; tip.style.left=(x-r.left)+'px'; tip.style.top=(y-r.top)+'px';
     },
-    onReady:()=>{loading.hidden=true; if(partsOpen){heart.setFocus(focusMode); renderParts();} heart.setTorso(torsoWanted()); if(mode==='ana'){applyHome3D();} else if(mode==='ogren'){applyLearn3D();} else if(mode==='sina'){applyQ3D();} else if(mode==='vaka'){applyV3D();} else heart.setMode(mode,mode==='durumlar'?COND[condKey]:null,condKey); heart.setXray(xray.checked); if(mode==='anatomi') applySys3D(); heart.select(selected); insets(); if(mode==='durumlar'&&(COND[condKey].fx||{}).infarct==='rca'){heart.viewFrom('inferior'); lastView=true;}},
+    onReady:()=>{loading.hidden=true; heart.setFocus(effFocus()); if(partsOpen) renderParts(); heart.setTorso(torsoWanted()); if(mode==='ana'){applyHome3D();} else if(mode==='ogren'){applyLearn3D();} else if(mode==='sina'){applyQ3D();} else if(mode==='vaka'){applyV3D();} else heart.setMode(mode,mode==='durumlar'?COND[condKey]:null,condKey); heart.setXray(xray.checked); if(mode==='anatomi') applySys3D(); heart.select(selected); insets(); if(mode==='durumlar'&&(COND[condKey].fx||{}).infarct==='rca'){heart.viewFrom('inferior'); lastView=true;}},
     onError:()=>{loading.innerHTML='3D model yüklenemedi. Dosyayı doğrudan açtıysan bir yerel sunucu ile aç<br>(ör. <code>python3 -m http.server</code>).';}
   });
   stage.insertBefore(heart.canvas,stage.firstChild);
@@ -415,7 +415,9 @@ $('btnReset').addEventListener('click',()=>heart&&heart.resetView());
 const partsEl=$('parts'), btnParts=$('btnParts');
 const PKIND=[['kas','Odacıklar ve kas'],['kapak','Kapaklar'],['damar','Damarlar'],['ileti','İleti sistemi'],['sinir','Otonom sinirler']];
 const PORDER=GROUPS.flatMap(g=>g[1]);
-let partsOpen=false, focusMode='glow', othersOp=1;
+let partsOpen=false, focusMode='ghost', othersOp=1;
+/* Anatomide bir yapı seçilince ona odaklan: kendisi dolu kalır, çevresi saydamlaşır. Parçalar paneli açıksa oradaki seçim geçerli. */
+const effFocus=()=>partsOpen?focusMode:(mode==='anatomi'?'ghost':'none');
 function pname(id){ return S[id]?S[id].n:id; }
 function renderParts(){
   if(!partsOpen) return;
@@ -423,7 +425,7 @@ function renderParts(){
   const top=heart&&heart.ready&&selected?heart.topOf(selected):null;
   let h=`<div class="ph"><b>Parçaları incele</b><button class="x2" type="button" data-pclose aria-label="Kapat">×</button></div>
   <div class="ctl"><small>Bir parçaya tıklayınca:</small>
-    <div class="pseg" role="group" aria-label="Seçilen parça">${[['glow','Parlasın'],['iso','Yalnız o kalsın'],['none','Normal']].map(([k,t])=>`<button type="button" data-fmode="${k}" aria-pressed="${focusMode===k}">${t}</button>`).join('')}</div>
+    <div class="pseg" role="group" aria-label="Seçilen parça">${[['ghost','Odaklansın'],['glow','Parlasın'],['iso','Yalnız o kalsın'],['none','Normal']].map(([k,t])=>`<button type="button" data-fmode="${k}" aria-pressed="${focusMode===k}">${t}</button>`).join('')}</div>
     <label class="oth" aria-disabled="${!top||focusMode!=='glow'}">Diğerleri<input type="range" id="othOp" min="0" max="1" step="0.05" value="${othersOp}" ${!top||focusMode!=='glow'?'disabled':''} aria-label="Seçili parça dışındaki dokuların görünürlüğü"></label>
   </div>`;
   if(!list.length) h+=`<p class="grp-h">3D model yükleniyor…</p>`;
@@ -440,7 +442,7 @@ function renderParts(){
 }
 function setPartsOpen(b){
   partsOpen=b; partsEl.hidden=!b; document.body.classList.toggle('parts-open',b); btnParts.setAttribute('aria-pressed',b);
-  heart&&heart.setFocus(b?focusMode:'none');
+  heart&&heart.setFocus(effFocus());
   renderParts(); insets();
 }
 btnParts.addEventListener('click',()=>setPartsOpen(!partsOpen));
@@ -478,6 +480,7 @@ document.querySelectorAll('[data-speed]').forEach(b=>b.addEventListener('click',
 function setMode(m){
   const prev=mode; mode=m; document.body.classList.remove('qtext'); document.body.dataset.mode=m;
   if(prev==='anatomi'&&m!=='anatomi') leaveSys3D();
+  if(heart&&heart.ready) heart.setFocus(effFocus());
   document.body.classList.remove('deck'); deckEl.hidden=true; if(flip) closeFlip();
   ['anatomi','durumlar','ogren','sina','vaka'].forEach(k=>{const a=$('tab-'+k); if(k===m)a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current');});
   if(m==='ana') $('brand').setAttribute('aria-current','page'); else $('brand').removeAttribute('aria-current');
