@@ -19,6 +19,7 @@
 
 <div class="stage" id="stage" aria-label="3D kalp modeli. Sürükleyerek döndür, kaydırarak yakınlaştır, tıklayarak bir yapıyı seç.">
   <div class="loading" id="loading"><span class="spin" aria-hidden="true"></span>3D kalp yükleniyor…</div>
+  <div class="sysbar" id="sysbar" role="group" aria-label="Sistem"></div>
   <div class="labels" id="labels"></div>
   <div class="tip" id="tip" hidden></div>
   <div class="flash" id="flash" aria-hidden="true"></div>
@@ -78,9 +79,9 @@
 <div class="toolbar" id="toolbar">
   <label class="tog"><input type="checkbox" id="t-xray"><span class="dot"></span>İçini göster</label>
   <label class="tog"><input type="checkbox" id="t-labels"><span class="dot"></span>İsimler</label>
-  <label class="tog"><input type="checkbox" id="t-cond" checked><span class="dot"></span>İleti</label>
-  <label class="tog"><input type="checkbox" id="t-nerves" checked><span class="dot"></span>Sinirler</label>
-  <label class="tog"><input type="checkbox" id="t-vessels" checked><span class="dot"></span>Damarlar</label>
+  <label class="tog layer-tog"><input type="checkbox" id="t-cond" checked><span class="dot"></span>İleti</label>
+  <label class="tog layer-tog"><input type="checkbox" id="t-nerves" checked><span class="dot"></span>Sinirler</label>
+  <label class="tog layer-tog"><input type="checkbox" id="t-vessels" checked><span class="dot"></span>Damarlar</label>
   <label class="tog torso-tog"><input type="checkbox" id="t-torso" checked><span class="dot"></span>Gövde</label>
   <button class="tog tbtn" id="btnParts" type="button" aria-pressed="false"><span class="dot"></span>Parçalar</button>
   <button class="btn" id="btnReset" type="button" title="Görünümü sıfırla" aria-label="Görünümü sıfırla">↺</button>
@@ -111,6 +112,7 @@
 <script src="js/lessons.js"></script>
 <script src="js/quiz.js"></script>
 <script src="js/cases.js"></script>
+<script src="js/cases2.js"></script>
 <script src="js/patients.js"></script>
 <script src="js/ecg12.js"></script>
 <script src="js/i18n.js"></script>

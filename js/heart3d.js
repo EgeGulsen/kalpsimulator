@@ -63,7 +63,7 @@ function create(el,opts){
   AG.matrixAutoUpdate=false; VG.matrixAutoUpdate=false;
   H.add(AG,VG,SG);
 
-  const state={mode:'anatomi',xray:false,selected:null,off:[],nerveOn:[],key:'nsr',cond:null,fx:{},layers:{vessels:true,cond:true,nerves:true},parts:{},focus:'none',others:1,torso:false};
+  const state={mode:'anatomi',xray:false,selected:null,off:[],nerveOn:[],key:'nsr',cond:null,fx:{},layers:{vessels:true,cond:true,nerves:true},parts:{},dim:{},focus:'none',others:1,torso:false};
   const api={canvas:renderer.domElement,ready:false};
   let R=null; // modele bağlı her şey burada
 
@@ -563,7 +563,7 @@ function create(el,opts){
       if(id==='ap') continue;
       const ps=partState(id), me=id===top;
       const show=f==='iso'?me:ps.vis;
-      const op=ps.op*(f!=='none'&&!me?state.others:1);
+      const op=ps.op*(state.dim[id]==null||me?1:state.dim[id])*(f!=='none'&&!me?state.others:1);
       const seen=new Set(), kind=R.byId[id].kind;
       for(const mesh of R.byId[id].meshes){
         const baseVis=(kind==='kas'||kind==='kapak')?true:mesh.visible; // diğerlerinin görünürlüğünü katmanlar belirler
@@ -1115,6 +1115,7 @@ function create(el,opts){
     resetParts(){ state.parts={}; state.others=1; applyStatic(); },
     setFocus(mode){ state.focus=mode||'none'; applyStatic(); },
     setOthers(v){ state.others=v; applyStatic(); },
+    setDim(map){ state.dim=map||{}; applyStatic(); }, // sistem katmanı: seçili sistem dışındaki parçaların saydamlığı
     topOf,
     setTorso(on,fly){ const ch=state.torso!==!!on; state.torso=!!on; torsoG.visible=!!on; if(ch&&fly!==false){ if(on) flyTo(TORSO_VIEW.pos,TORSO_VIEW.target); else flyTo(HOME.pos,HOME.target); } },
     torsoView(){ flyTo(TORSO_VIEW.pos,TORSO_VIEW.target); },
