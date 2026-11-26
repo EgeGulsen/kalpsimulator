@@ -249,6 +249,7 @@ const SOURCES=[
   ['Kenhub: Right coronary artery','https://www.kenhub.com/en/library/anatomy/right-coronary-artery'],
   ['University of Minnesota, Atlas of Human Cardiac Anatomy: Coronary arterial anatomy','https://www.vhlab.umn.edu/atlas/coronary-system-tutorial/coronary-arterial-anatomy.shtml'],
   ['University of Minnesota, Atlas of Human Cardiac Anatomy: Coronary venous anatomy','https://www.vhlab.umn.edu/atlas/coronary-system-tutorial/coronary-venous-anatomy.shtml'],
+  ['Loscalzo J, Fauci A, Kasper D, et al. Harrison’s Principles of Internal Medicine, 21st ed. McGraw Hill, 2022','https://accessmedicine.mhmedical.com/book.aspx?bookid=3095'],
   ['BodyParts3D (3D model)','https://lifesciencedb.jp/bp3d/']
 ];
 
