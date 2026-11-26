@@ -34,28 +34,41 @@ try{
   loading.textContent='3D görünüm bu tarayıcıda açılamadı (WebGL gerekli).';
   console.error(err);
 }
-/* Kalbi panellerin arasındaki boş alanın ortasına yerleştir */
+/* Kalp kendi kartının içinde durur; yalnız alttaki araç çubuğu kadar yukarı kaydır */
 function insets(){
   if(!heart||!heart.setInsets) return;
-  if(narrow()){heart.setInsets(0,0,0,0); return;}
-  const W=innerWidth, nav=$('nav').getBoundingClientRect(), card=$('card');
-  const left=Math.max(nav.right,$('parts').getBoundingClientRect().right), right=card.classList.contains('hide')?0:W-card.getBoundingClientRect().left;
-  const top=mode==='durumlar'||(mode==='vaka'&&monitor.classList.contains('show'))?$('monitor').getBoundingClientRect().bottom-40:mode==='ogren'?$('ecg12').getBoundingClientRect().bottom-40:60;
-  heart.setInsets(top,left,right,70);
+  heart.setInsets(0,0,0,narrow()?0:62);
 }
 window.addEventListener('resize',()=>{insets(); sizeCanvas();});
+
+/* ---------- İlerleme: görülen konular ve günlük seri (yalnız bu tarayıcıda) ---------- */
+const seen={a:[],d:[],l:[]};
+try{ const sv=JSON.parse(localStorage.getItem('kalp.seen')||'null'); if(sv) for(const k in seen) if(Array.isArray(sv[k])) seen[k]=sv[k]; }catch(e){}
+function markSeen(k,id){ if(!id||seen[k].includes(id)) return; seen[k].push(id); try{ localStorage.setItem('kalp.seen',JSON.stringify(seen)); }catch(e){} }
+const isSeen=(k,id)=>seen[k].includes(id);
+const streak=(()=>{ const day=d=>d.toISOString().slice(0,10), today=day(new Date()), yest=day(new Date(Date.now()-864e5));
+  let s={last:null,n:0}; try{ s=JSON.parse(localStorage.getItem('kalp.streak')||'null')||s; }catch(e){}
+  if(s.last!==today){ s.n=s.last===yest?s.n+1:1; s.last=today; try{ localStorage.setItem('kalp.streak',JSON.stringify(s)); }catch(e){} }
+  return s.n; })();
+const FLAME=`<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 2c1 3.5 5 5.6 5 10.5A5 5 0 0 1 12 18a5 5 0 0 1-5-5.2c0-2 1-3.4 2-4.3.2 1.6 1 2.6 2 3 0-3.6-1-6.5 1-9.5z" fill="#f2a93b"/><path d="M12 22a4 4 0 0 1-4-4c0-1.8 1.3-3 2.3-3.8.2 1.3.9 2 1.7 2.3.3-1.6.9-2.6 2-3.5.6 1.4 2 2.5 2 5a4 4 0 0 1-4 4z" fill="#ef6a5b"/></svg>`;
+function progHTML(k,ids,label){
+  const n=ids.filter(id=>isSeen(k,id)).length, pct=ids.length?Math.round(100*n/ids.length):0;
+  return `<div class="streak">${FLAME}<span><b>${streak}</b> gün üst üste</span></div>
+    <div class="prog"><span>${esc(label)}: ${n}/${ids.length}</span><div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="${ids.length}" aria-valuenow="${n}" aria-label="${esc(label)}"><i style="width:${pct}%"></i></div></div>`;
+}
+const seenDot=(k,id)=>`<span class="seen${isSeen(k,id)?' y':''}" aria-hidden="true">✓</span>`;
 
 /* ---------- Sol liste ---------- */
 const nav=$('nav');
 function navAnatomy(){
   const q=query.trim().toLocaleLowerCase('tr');
   const hit=id=>!q||(S[id].n+' '+(S[id].l||'')).toLocaleLowerCase('tr').includes(q);
-  let html=`<input class="search" id="search" type="search" placeholder="Yapı ara: ör. diyagonal, koroner sinüs" value="${esc(query)}" aria-label="Yapı ara">`;
+  let html=progHTML('a',Object.keys(S),'İncelenen yapı')+`<input class="search" id="search" type="search" placeholder="Yapı ara: ör. diyagonal, koroner sinüs" value="${esc(query)}" aria-label="Yapı ara">`;
   let any=false;
   for(const [g,ids] of GROUPS){
     const vis=ids.filter(hit); if(!vis.length) continue; any=true;
     html+=`<div class="grp-h">${esc(g)}<span>${vis.length}</span></div>`;
-    html+=vis.map(id=>`<button class="item${S[id].p?' sub':''}" type="button" data-id="${id}" aria-current="${id===selected}"><i class="k" style="background:${dotCol(id)}"></i>${esc(S[id].n)}</button>`).join('');
+    html+=vis.map(id=>`<button class="item${S[id].p?' sub':''}" type="button" data-id="${id}" aria-current="${id===selected}"><i class="k" style="background:${dotCol(id)}"></i>${esc(S[id].n)}${seenDot('a',id)}</button>`).join('');
   }
   if(!any) html+=`<p class="grp-h">Sonuç yok</p>`;
   return html;
@@ -63,7 +76,7 @@ function navAnatomy(){
 let navOpen=false;
 function navConds(){
   const c=COND[condKey];
-  return `<button class="navtog" type="button" data-navtog aria-expanded="${navOpen}"><span><small>Senaryo seç · ${Object.keys(COND).length} durum</small>${esc(c.n)}</span><i aria-hidden="true">▾</i></button><div class="navbody">`+CATS.map(([k,nm])=>`<div class="grp-h">${esc(nm)}</div>`+Object.entries(COND).filter(([,c])=>c.cat===k).map(([key,c])=>`<button class="item cond" type="button" data-cond="${key}" aria-current="${key===condKey}">${esc(c.n)}${CASES.some(x=>x.cond===key)?'<span class="vtag" title="Bu durum için hasta vakası var">Vaka</span>':''}</button>`).join('')).join('')+`</div>`;
+  return `<button class="navtog" type="button" data-navtog aria-expanded="${navOpen}"><span><small>Senaryo seç · ${Object.keys(COND).length} durum</small>${esc(c.n)}</span><i aria-hidden="true">▾</i></button><div class="navbody">`+progHTML('d',Object.keys(COND),'Çalışılan durum')+CATS.map(([k,nm])=>`<div class="grp-h">${esc(nm)}</div>`+Object.entries(COND).filter(([,c])=>c.cat===k).map(([key,c])=>`<button class="item cond" type="button" data-cond="${key}" aria-current="${key===condKey}">${esc(c.n)}${CASES.some(x=>x.cond===key)?'<span class="vtag" title="Bu durum için hasta vakası var">Vaka</span>':''}${seenDot('d',key)}</button>`).join('')).join('')+`</div>`;
 }
 function renderNav(){
   const ae=document.activeElement&&document.activeElement.id==='search', pos=ae?$('search').selectionStart:0;
@@ -92,6 +105,7 @@ function anatomyHTML(){
     <p>Model, gerçek bir insan kalbinin BodyParts3D taramasından üretildi. Odacıklar, kapaklar, koroner arter dalları, kardiyak venler, ileti sistemi ve otonom sinirler ayrı ayrı seçilebilir. Her yapının Latince adı, kanlanması ve klinik önemi burada açılır.</p>
     <p>Sürükleyerek çevir, kaydırarak yakınlaştır, bir yapıya tıklayarak seç. <b>İçini göster</b> miyokardı saydamlaştırıp ileti sistemini ortaya çıkarır; <b>Parçalar</b> tek tek gizleme ve izole etme sağlar.</p>
     <div class="legend"><span><i class="sw" style="background:var(--cond)"></i>İleti sistemi</span><span><i class="sw" style="background:repeating-linear-gradient(90deg,var(--cond) 0 5px,transparent 5px 9px)"></i>Otonom sinir</span><span><i class="sw" style="background:#d8414a"></i>Arter</span><span><i class="sw" style="background:#5a5fb4"></i>Ven</span></div>
+    <div class="actions"><button class="bigbtn" type="button" data-anext="${GROUPS[0][1][0]}">İlk yapıdan başla<small>${esc(S[GROUPS[0][1][0]].n)}</small></button></div>
     <div class="disc">Toplam ${Object.keys(S).length} yapı. Soldaki listeden ya da arama kutusundan da seçebilirsin.</div>`;
   const s=S[selected], par=s.p&&S[s.p];
   const kids=Object.keys(S).filter(k=>S[k].p===selected);
@@ -101,6 +115,7 @@ function anatomyHTML(){
   if(s.b) more+=`<div><dt>Kanlanma</dt><dd>${esc(s.b)}</dd></div>`;
   if(s.c) more+=`<div><dt>Klinik önemi</dt><dd>${esc(s.c)}</dd></div>`;
   const chip=id=>`<button type="button" data-id="${id}">${esc(S[id].n)}</button>`;
+  const ord=GROUPS.flatMap(g=>g[1]).filter(x=>S[x]), anext=ord[ord.indexOf(selected)+1];
   return `${closeBtn}
     ${par?`<div class="crumb"><button type="button" data-id="${s.p}">${esc(par.n)}</button><span>›</span></div>`:''}
     <div>${kindHTML(s.k)}<h2>${esc(s.n)}</h2><div class="latin">${esc(s.l||'')}</div></div>
@@ -108,7 +123,8 @@ function anatomyHTML(){
     ${more?`<dl class="facts">${more}</dl>`:''}
     ${s.note?`<div class="note">${esc(s.note)}</div>`:''}
     ${kids.length?`<div><div class="eyebrow" style="margin-bottom:6px">Dalları ve bölümleri</div><div class="chips">${kids.map(chip).join('')}</div></div>`:''}
-    ${sibs.length?`<div><div class="eyebrow" style="margin-bottom:6px">Komşu dallar</div><div class="chips">${sibs.map(chip).join('')}</div></div>`:''}`;
+    ${sibs.length?`<div><div class="eyebrow" style="margin-bottom:6px">Komşu dallar</div><div class="chips">${sibs.map(chip).join('')}</div></div>`:''}
+    ${anext?`<div class="actions"><button class="bigbtn" type="button" data-anext="${anext}">Sonraki yapı<small>${esc(S[anext].n)}</small></button></div>`:''}`;
 }
 function stateOf(id){
   const c=COND[condKey], k=S[id].k, fx=c.fx||{};
@@ -132,9 +148,10 @@ function condHTML(){
   if(fx.block||fx.blockFlash) leg.push(`<span><i class="sw" style="background:var(--block)"></i>Blok</span>`);
   const read=c.read?`<dl class="read">${Object.entries(c.read).map(([k,v])=>`<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>`:'';
   const cs=CASES.find(x=>x.cond===condKey);
-  const go=cs?`<button class="vgo" type="button" data-gocase="${cs.id}"><span><small>Vaka</small><b>Bu durumu bir hasta üzerinde yönet</b></span><i aria-hidden="true">→</i></button>`:'';
-  return `${closeBtn}<div><div class="eyebrow">${esc(c.tag)}</div><h2>${esc(c.n)}</h2></div>
-    ${go}
+  const go=cs?`<button class="vgo" type="button" data-gocase="${cs.id}"><i aria-hidden="true">▶</i>Bu durumu vakada dene</button>`:'';
+  const order=CATS.flatMap(([k])=>Object.keys(COND).filter(x=>COND[x].cat===k)), nx=COND[order[(order.indexOf(condKey)+1)%order.length]];
+  const catN=(CATS.find(x=>x[0]===c.cat)||[])[1];
+  return `${closeBtn}<div><div class="pills">${catN?`<span class="pill g">${esc(catN)}</span>`:''}${cs?'<span class="pill">Vaka var</span>':''}${isSeen('d',condKey)?'<span class="pill r">Çalışıldı</span>':''}</div><h2>${esc(c.n)}</h2><div class="sub2">${esc(c.tag)}</div></div>
     <div class="beats"><span class="beat"><i id="bA"></i>Atriyumlar</span><span class="beat"><i id="bV"></i>Ventriküller</span></div>
     <p>${esc(c.sum)}</p>
     ${read}
@@ -149,6 +166,7 @@ function condHTML(){
     ${c.cli?`<details><summary>Klinikte</summary><p class="long">${esc(c.cli)}</p></details>`:''}
     ${c.note?`<div class="note">${esc(c.note)}</div>`:''}
     ${sel}
+    <div class="actions"><button class="bigbtn" type="button" data-condnext>Anladım, sonraki<small>${esc(nx.n)}</small></button>${go}</div>
     <div class="disc">Tıbbi tavsiye değildir. Tedavi bilgileri genel çerçevedir.</div>`;
 }
 let bA=null,bV=null;
@@ -161,6 +179,9 @@ function render(){
 card.addEventListener('click',e=>{
   if(e.target.id==='cardX'){cardOpen=false; card.classList.add('hide'); insets(); return;}
   const gc=e.target.closest('[data-gocase]'); if(gc){ location.hash='#vaka/'+gc.dataset.gocase; return; }
+  if(e.target.closest('[data-condnext]')){ markSeen('d',condKey); const order=CATS.flatMap(([k])=>Object.keys(COND).filter(x=>COND[x].cat===k)); setCond(order[(order.indexOf(condKey)+1)%order.length]); card.scrollTop=0; return; }
+  const an=e.target.closest('[data-anext]'); if(an){ select(an.dataset.anext); card.scrollTop=0; return; }
+  const ln=e.target.closest('[data-lnext]'); if(ln){ markSeen('l',lesson); setLesson(ln.dataset.lnext); card.scrollTop=0; return; }
   if(mode==='vaka'){ const va=e.target.closest('[data-va]'); if(va){ vkAnswer(+va.dataset.va); return; }
     const vl=e.target.closest('[data-vlv]'); if(vl){ setVLevel(+vl.dataset.vlv); return; }
     if(e.target.closest('[data-vstart]')){ startCase(e.target.closest('[data-vstart]').dataset.vstart||null); return; }
@@ -178,15 +199,15 @@ card.addEventListener('input',e=>{ if(e.target.id==='faqq'){ faqQ=e.target.value
 function openCard(){ if(!cardOpen){cardOpen=true; card.classList.remove('hide'); insets();} }
 function select(id){
   if(id&&!S[id]) id=null;
-  selected=id; heart&&heart.select(id); render(); renderNav();
+  selected=id; if(mode==='anatomi') markSeen('a',id); heart&&heart.select(id); render(); renderNav();
   if(id&&narrow()&&mode==='anatomi') card.scrollIntoView({behavior:reduce?'auto':'smooth',block:'nearest'});
 }
 
 
 /* ---------- Öğren ---------- */
 function navLearn(){
-  return `<div class="grp-h">Dersler</div>`+LESSONS.map((l,i)=>`<button class="item" type="button" data-lesson="${l.id}" aria-current="${l.id===lesson}"><small style="margin:0;min-width:18px">${i+1}</small>${esc(l.t)}</button>`).join('')+
-    `<div class="grp-h">Soru–cevap</div><button class="item" type="button" data-lesson="sss" aria-current="${lesson==='sss'}"><small style="margin:0;min-width:18px">?</small>Klinik soru–cevap (${FAQ.length})</button>`;
+  return progHTML('l',LESSONS.map(l=>l.id),'Tamamlanan ders')+`<div class="grp-h">Dersler</div>`+LESSONS.map((l,i)=>`<button class="item" type="button" data-lesson="${l.id}" aria-current="${l.id===lesson}"><span class="num">${i+1}</span>${esc(l.t)}${seenDot('l',l.id)}</button>`).join('')+
+    `<div class="grp-h">Soru–cevap</div><button class="item" type="button" data-lesson="sss" aria-current="${lesson==='sss'}"><span class="num">?</span>Klinik soru–cevap (${FAQ.length})</button>`;
 }
 function learnHTML(){
   if(lesson==='sss'){ const groups=[...new Set(FAQ.map(f=>f[0]))];
@@ -196,9 +217,10 @@ function learnHTML(){
     <div class="faq">${groups.map(g=>`<div class="faqg"><div class="eyebrow">${esc(g)}</div>${FAQ.filter(f=>f[0]===g).map(([,q,a])=>`<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('')}</div>`).join('')}</div>
     <div class="disc">Eğitim amaçlıdır. Doz ve algoritmalar kurum protokollerine ve güncel kılavuzlara göre doğrulanmalıdır.</div>`; }
   const i=LESSONS.findIndex(l=>l.id===lesson), l=LESSONS[i], prev=LESSONS[i-1], next=LESSONS[i+1];
-  return `${closeBtn}<div><div class="eyebrow">Ders ${i+1} / ${LESSONS.length}</div><h2>${esc(l.t)}</h2></div>
+  return `${closeBtn}<div><div class="pills"><span class="pill g">Ders ${i+1} / ${LESSONS.length}</span>${isSeen('l',l.id)?'<span class="pill r">Tamamlandı</span>':''}</div><h2>${esc(l.t)}</h2></div>
+    <div class="prog"><div class="bar"><i style="width:${Math.round(100*(i+1)/LESSONS.length)}%"></i></div></div>
     <div class="lesson">${l.body}</div>
-    <div class="pager">${prev?`<button class="btn" type="button" data-lesson="${prev.id}">← ${esc(prev.t)}</button>`:'<span></span>'}${next?`<button class="btn" type="button" data-lesson="${next.id}">${esc(next.t)} →</button>`:`<button class="btn" type="button" data-lesson="sss">Klinik soru–cevap →</button>`}</div>
+    <div class="actions"><button class="bigbtn" type="button" data-lnext="${next?next.id:'sss'}">Anladım, sonraki<small>${esc(next?next.t:'Klinik soru–cevap')}</small></button>${prev?`<button class="lnk" type="button" data-lesson="${prev.id}">← Önceki ders: ${esc(prev.t)}</button>`:''}</div>
     <div class="disc">Değerler erişkinler için genel kabul gören aralıklardır. EKG eğrileri bu sitedeki basitleştirilmiş vektör modelinden üretilir.</div>`;
 }
 function setLesson(id){
@@ -274,12 +296,12 @@ function draw12(){
   x12.font='600 12px "JetBrains Mono", monospace';
   for(let r=0;r<3;r++) for(let c=0;c<4;c++){
     const id=E12.GRID[r][c], ox=c*cw, base=r*rh+rh*0.6, sel=id===lead;
-    if(sel){x12.fillStyle='#b01f2d0d'; x12.fillRect(ox,r*rh,cw,rh); x12.strokeStyle='#b01f2d'; x12.lineWidth=1.5; x12.strokeRect(ox+1,r*rh+1,cw-2,rh-2);}
+    if(sel){x12.fillStyle='#ef6a5b12'; x12.fillRect(ox,r*rh,cw,rh); x12.strokeStyle='#e0523f'; x12.lineWidth=1.5; x12.strokeRect(ox+1,r*rh+1,cw-2,rh-2);}
     x12.save(); x12.beginPath(); x12.rect(ox,r*rh,cw,rh); x12.clip();
-    x12.strokeStyle=sel?'#b01f2d':ECG; x12.lineWidth=sel?1.9:1.4; x12.lineJoin='round'; x12.beginPath();
+    x12.strokeStyle=sel?'#e0523f':ECG; x12.lineWidth=sel?1.9:1.4; x12.lineJoin='round'; x12.beginPath();
     strokeCols(x12,cols,t=>E12.leadValue(id,vmap.get(t),variant),v=>base-v*ppmv,ox);
     x12.stroke(); x12.restore();
-    x12.fillStyle=sel?'#b01f2d':ECG; x12.fillText(id==='I'||id==='II'||id==='III'?'D'+id:id,ox+7,r*rh+16);
+    x12.fillStyle=sel?'#e0523f':ECG; x12.fillText(id==='I'||id==='II'||id==='III'?'D'+id:id,ox+7,r*rh+16);
     if(c>0){x12.strokeStyle=MUTED; x12.lineWidth=1; x12.beginPath(); x12.moveTo(ox+.5,r*rh); x12.lineTo(ox+.5,(r+1)*rh); x12.stroke();}
   }
   x12.strokeStyle=GRID2; for(let r=1;r<3;r++){x12.beginPath(); x12.moveTo(0,r*rh+.5); x12.lineTo(W,r*rh+.5); x12.stroke();}
@@ -301,7 +323,7 @@ function drawLabels(){
   const fits=(x,y,w)=>{const r={l:x-w/2,r:x+w/2,t:y-34,b:y-10}; if(boxes.some(b=>!(r.r<b.l||r.l>b.r||r.b<b.t||r.t>b.b))) return false; boxes.push(r); return true;};
   if(pin&&S[pin.id]){ fits(pin.x,pin.y,S[pin.id].n.length*7.4+24); place('pin',pin.id,pin.x,pin.y,'pin'); }
   else if(selected){ const a=list.find(l=>l.id===selected); if(a){ fits(a.x,a.y,S[selected].n.length*7.4+24); place('pin',selected,a.x,a.y,'pin'); } }
-  const topLim=monitor.classList.contains('show')&&!narrow()?monitor.getBoundingClientRect().bottom+30:0;
+  const topLim=0;
   if(show){
     list.filter(a=>a.y>topLim).slice().sort((a,b)=>a.depth-b.depth).forEach(a=>{
       if(!S[a.id]||a.id===selected) return;
@@ -682,7 +704,8 @@ document.addEventListener('keydown',e=>{
 
 /* Hakkında */
 $('srcList').innerHTML=(SOURCES||[]).map(([t,u])=>`<li><a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a></li>`).join('');
-$('btnAbout').addEventListener('click',()=>{const d=$('about'); d.showModal?d.showModal():d.setAttribute('open','');});
+const openAbout=()=>{const d=$('about'); d.showModal?d.showModal():d.setAttribute('open','');};
+$('btnAbout').addEventListener('click',openAbout); $('btnAbout2').addEventListener('click',openAbout);
 
 /* ---------- EKG ---------- */
 const cv=$('ecg'), ctx=cv.getContext('2d');
@@ -699,7 +722,7 @@ function drawECG(){
   ctx.strokeStyle=ECG; ctx.lineWidth=1.6; ctx.lineJoin='round'; ctx.beginPath();
   strokeCols(ctx,traceCols(t0,pps,Math.ceil(W)),t=>sim.ecgAt(t),v=>base-v*ppmv,0);
   ctx.stroke();
-  ctx.fillStyle='#b01f2d'; ctx.beginPath(); ctx.arc(W-3,base-sim.ecgAt(sim.t)*ppmv,3,0,7); ctx.fill();
+  ctx.fillStyle='#e0523f'; ctx.beginPath(); ctx.arc(W-3,base-sim.ecgAt(sim.t)*ppmv,3,0,7); ctx.fill();
   const c=COND[ecgKey()], r=c.r, X=t=>(t-t0)*pps, lb=ecgLabels();
   if(lb==='none') return; // soruda ipucu yazıları gizli
   ctx.font='500 11px "JetBrains Mono", monospace'; ctx.fillStyle=MUTED; ctx.textAlign='center';
