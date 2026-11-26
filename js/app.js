@@ -1,6 +1,8 @@
 /* Kalp Simülatörü: arayüz, mod geçişi, etiketler ve EKG çizimi. */
 (function(){
 'use strict';
+const I18=window.KalpI18n||{lang:'tr',apply(){},L:(a)=>a,t:s=>s}; I18.apply();
+const LG=I18.L, LC=s=>s.toLocaleLowerCase(I18.lang), DL=id=>I18.lang==='tr'&&(id==='I'||id==='II'||id==='III')?'D'+id:id;
 const {KIND,S,GROUPS,COND,CATS,SOURCES,LESSONS,FAQ,MCQ,ECG_POOL,CASES,LEVELS}=window.KALP;
 const E12=window.KalpECG12;
 const $=id=>document.getElementById(id);
@@ -61,8 +63,8 @@ const seenDot=(k,id)=>`<span class="seen${isSeen(k,id)?' y':''}" aria-hidden="tr
 /* ---------- Sol liste ---------- */
 const nav=$('nav');
 function navAnatomy(){
-  const q=query.trim().toLocaleLowerCase('tr');
-  const hit=id=>!q||(S[id].n+' '+(S[id].l||'')).toLocaleLowerCase('tr').includes(q);
+  const q=LC(query.trim());
+  const hit=id=>!q||LC(S[id].n+' '+(S[id].l||'')).includes(q);
   let html=progHTML('a',Object.keys(S),'İncelenen yapı')+`<input class="search" id="search" type="search" placeholder="Yapı ara: ör. diyagonal, koroner sinüs" value="${esc(query)}" aria-label="Yapı ara">`;
   let any=false;
   for(const [g,ids] of GROUPS){
@@ -201,7 +203,7 @@ card.addEventListener('click',e=>{
   const ls=e.target.closest('[data-lesson]'); if(ls){ setLesson(ls.dataset.lesson); card.scrollTop=0; return; }
   const b=e.target.closest('[data-id]'); if(b) select(b.dataset.id);
 });
-card.addEventListener('input',e=>{ if(e.target.id==='faqq'){ faqQ=e.target.value; const q=faqQ.trim().toLocaleLowerCase('tr'); card.querySelectorAll('.faq details').forEach(d=>{d.hidden=!!q&&!d.textContent.toLocaleLowerCase('tr').includes(q);}); card.querySelectorAll('.faqg').forEach(g=>{g.hidden=!g.querySelector('details:not([hidden])');}); } });
+card.addEventListener('input',e=>{ if(e.target.id==='faqq'){ faqQ=e.target.value; const q=LC(faqQ.trim()); card.querySelectorAll('.faq details').forEach(d=>{d.hidden=!!q&&!d.textContent.toLocaleLowerCase('tr').includes(q);}); card.querySelectorAll('.faqg').forEach(g=>{g.hidden=!g.querySelector('details:not([hidden])');}); } });
 function openCard(){ if(!cardOpen){cardOpen=true; card.classList.remove('hide'); insets();} }
 function select(id){
   if(id&&!S[id]) id=null;
@@ -238,9 +240,9 @@ function setLesson(id){
 const e12=$('ecg12'), c12=$('ecg12c'), x12=c12.getContext('2d');
 function setLead(id,quiet){
   if(!E12.LEADS[id]) return; lead=id; heart&&heart.setLeadSel(id);
-  const L=E12.LEADS[id]; $('e12sel').textContent=id==='II'||id==='III'||id==='I'?'D'+id:id;
-  $('e12info').textContent=`${L.wall} · ${L.plane} düzlem ${L.angle} · ${L.where}`;
-  $('e12info').title=`${L.where} Baktığı bölge: ${L.wall}. İlgili arter: ${L.art}.`;
+  const L=E12.LEADS[id]; $('e12sel').textContent=DL(id);
+  $('e12info').textContent=LG(`${L.wall} · ${L.plane} düzlem ${L.angle} · ${L.where}`,`${L.wall} · ${L.plane} plane ${L.angle} · ${L.where}`);
+  $('e12info').title=LG(`${L.where} Baktığı bölge: ${L.wall}. İlgili arter: ${L.art}.`,`${L.where} Region viewed: ${L.wall}. Related artery: ${L.art}.`);
 }
 function setVariant(v){
   variant=v; $('e12var').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===v));
@@ -307,7 +309,7 @@ function draw12(){
     x12.strokeStyle=sel?'#e0523f':ECG; x12.lineWidth=sel?1.9:1.4; x12.lineJoin='round'; x12.beginPath();
     strokeCols(x12,cols,t=>E12.leadValue(id,vmap.get(t),variant),v=>base-v*ppmv,ox);
     x12.stroke(); x12.restore();
-    x12.fillStyle=sel?'#e0523f':ECG; x12.fillText(id==='I'||id==='II'||id==='III'?'D'+id:id,ox+7,r*rh+16);
+    x12.fillStyle=sel?'#e0523f':ECG; x12.fillText(DL(id),ox+7,r*rh+16);
     if(c>0){x12.strokeStyle=MUTED; x12.lineWidth=1; x12.beginPath(); x12.moveTo(ox+.5,r*rh); x12.lineTo(ox+.5,(r+1)*rh); x12.stroke();}
   }
   x12.strokeStyle=GRID2; for(let r=1;r<3;r++){x12.beginPath(); x12.moveTo(0,r*rh+.5); x12.lineTo(W,r*rh+.5); x12.stroke();}
@@ -339,7 +341,7 @@ function drawLabels(){
   }
   if(mode==='ogren'&&heart.leadsScreen){
     for(const e of heart.leadsScreen()){
-      const key='e:'+e.id; let el=pool.get(key); if(!el){el=document.createElement('div'); labLayer.appendChild(el); pool.set(key,el); el.dataset.lead=e.id; el.textContent=E12.LEADS[e.id]&&(e.id.length<4&&e.id[0]==='I'?'D'+e.id:e.id);}
+      const key='e:'+e.id; let el=pool.get(key); if(!el){el=document.createElement('div'); labLayer.appendChild(el); pool.set(key,el); el.dataset.lead=e.id; el.textContent=E12.LEADS[e.id]&&DL(e.id);}
       el.className='lab e'+(e.limb?'':' p')+(e.id===lead?' sel':''); el.style.transform=`translate(${e.x}px,${e.y}px) translate(-50%,calc(-100% - 12px))`; used.add(key);
     }
   }
@@ -412,7 +414,7 @@ function setCond(k){
   render(); renderNav();
 }
 const btnPlay=$('btnPlay');
-btnPlay.addEventListener('click',()=>{sim.playing=!sim.playing; btnPlay.textContent=sim.playing?'Duraklat':'Oynat';});
+btnPlay.addEventListener('click',()=>{sim.playing=!sim.playing; btnPlay.textContent=sim.playing?LG('Duraklat','Pause'):LG('Oynat','Play');});
 document.querySelectorAll('[data-speed]').forEach(b=>b.addEventListener('click',()=>{sim.speed=+b.dataset.speed; document.querySelectorAll('[data-speed]').forEach(x=>x.setAttribute('aria-pressed',x===b));}));
 
 function setMode(m){
@@ -443,7 +445,7 @@ function setMode(m){
     selected=null; if(!quiz.cur) newQ(); else { applyQ3D(); render(); renderNav(); }
   } else if(live){
     if(selected&&!['ileti','sinir'].includes(S[selected].k)) selected=null;
-    if(reduce&&sim.playing){sim.playing=false; btnPlay.textContent='Oynat';}
+    if(reduce&&sim.playing){sim.playing=false; btnPlay.textContent=LG('Oynat','Play');}
     if(prev!=='durumlar') xray.checked=false; // senaryolar kalbin dışıyla açılır
     setCond(condKey);
   } else {
@@ -561,7 +563,7 @@ function quizHTML(){
   if(q.t==='bul'){
     const s=S[q.target], par=s.p&&S[s.p];
     let h=`${head}<h2>${esc(s.n)}</h2><div class="latin">${esc(s.l||'')}</div></div>
-      <p>Bu yapıyı 3D kalpte bul ve üzerine tıkla. Kalbi sürükleyerek çevirebilirsin.${needsXray(q.target)?' İçeride olduğu için <b>İçini göster</b> açıldı.':''}${par?` İpucu: ${esc(par.n)} içinde bir bölüm.`:''}</p>`;
+      <p>${LG('Bu yapıyı 3D kalpte bul ve üzerine tıkla. Kalbi sürükleyerek çevirebilirsin.','Find this structure on the 3D heart and click it. You can drag to rotate the heart.')}${needsXray(q.target)?LG(' İçeride olduğu için <b>İçini göster</b> açıldı.',' It lies inside, so <b>Show inside</b> was turned on.'):''}${par?LG(` İpucu: ${esc(par.n)} içinde bir bölüm.`,` Hint: it is a part of ${esc(par.n)}.`):''}</p>`;
     if(q.clicks.length&&!q.done) h+=`<div class="qres no">Tıkladığın: ${esc(S[q.clicks[q.clicks.length-1]]?S[q.clicks[q.clicks.length-1]].n:'?')}. Bu değil, ${3-q.tries} hakkın kaldı.</div>`;
     if(!q.done) h+=`<button class="btn qgive" type="button" data-qgive>Göster</button>`;
     else h+=`${verdict(q)}${!q.ok?'<p>Doğru yer kalpte turuncu ile işaretlendi ve kalp o tarafa çevrildi.</p>':''}<p>${esc(s.d)}</p>${s.c?`<dl class="facts"><div><dt>Klinik önemi</dt><dd>${esc(s.c)}</dd></div></dl>`:''}${nextBtn}`;
@@ -859,9 +861,9 @@ function rxApply(i){
   const r=evalRx(vk.custom.cond,vk.custom.P)[i]; if(!r) return;
   r.why.forEach(w=>{ if(w[2]&&(w[0]==='no'||w[0]==='warn')) vk.flags.add(w[2]); });
   const L=vk.custom.log;
-  if(r.st==='no'){ L.push({i,n:r.n,t:'Kontrendike: '+(r.why.filter(w=>w[0]==='no').map(w=>w[1]).join(' ')||''),cls:'no'}); render(); return; }
+  if(r.st==='no'){ L.push({i,n:r.n,t:LG('Kontrendike: ','Contraindicated: ')+(r.why.filter(w=>w[0]==='no').map(w=>w[1]).join(' ')||''),cls:'no'}); render(); return; }
   vk.custom.done.push(i);
-  const fin=()=>{ L.push({i,n:r.n,t:(r.res||(r.next&&r.next!==vk.cur?'Ritim değişti: '+COND[r.next].n+'.':'Uygulandı.'))+(r.st==='warn'?' Yukarıdaki dikkat notları gözetilerek uygulandı.':''),cls:r.st==='warn'?'wa':'ok'}); };
+  const fin=()=>{ L.push({i,n:r.n,t:(r.res||(r.next&&r.next!==vk.cur?LG('Ritim değişti: ','Rhythm changed: ')+COND[r.next].n+'.':LG('Uygulandı.','Applied.')))+(r.st==='warn'?LG(' Yukarıdaki dikkat notları gözetilerek uygulandı.',' Applied with the cautions above in mind.'):''),cls:r.st==='warn'?'wa':'ok'}); };
   if(r.anim&&heart&&heart.ready){
     vk.busy=true; const cap=$('txcap'); cap.textContent=r.anim.t; cap.hidden=false; const fx=COND[vk.custom.cond].fx||{};
     heart.treat(r.anim.k,{c:r.anim.c,vessel:fx.infarct==='rca'?'rca':'lad',onFlash:stageFlash,onFire:()=>{ if(r.next) switchCond(r.next); },onDone:()=>{ vk.busy=false; cap.hidden=true; fin(); render(); }});
@@ -920,6 +922,29 @@ function toggleTheme(e){
 document.querySelectorAll('.themebtn').forEach(b=>b.addEventListener('click',toggleTheme));
 darkMQ.addEventListener&&darkMQ.addEventListener('change',()=>{ if(!root.dataset.theme) themeColors(); });
 
+/* Dil seçimi: dünya düğmesi küçük bir menü açar; seçim kaydedilir ve sayfa o dilde yeniden açılır */
+const langMenu=$('langMenu'), langBtns=[$('btnLang'),$('btnLang2')].filter(Boolean);
+let langFrom=null;
+document.querySelectorAll('.langcode').forEach(s=>s.textContent=I18.lang.toUpperCase());
+langMenu.querySelectorAll('[data-lang]').forEach(b=>b.setAttribute('aria-checked',b.dataset.lang===I18.lang));
+function closeLang(focus){ if(langMenu.hidden) return; langMenu.hidden=true; langBtns.forEach(b=>b.setAttribute('aria-expanded','false')); if(focus&&langFrom) langFrom.focus(); langFrom=null; }
+function openLang(btn){
+  langFrom=btn; langMenu.hidden=false; btn.setAttribute('aria-expanded','true');
+  const r=btn.getBoundingClientRect(), m=langMenu.getBoundingClientRect();
+  if(btn.id==='btnLang'){ langMenu.style.left=(r.right+10)+'px'; langMenu.style.top=Math.max(8,Math.min(r.top,innerHeight-m.height-8))+'px'; }
+  else { langMenu.style.left=Math.max(8,Math.min(r.right-m.width,innerWidth-m.width-8))+'px'; langMenu.style.top=(r.bottom+8)+'px'; }
+  (langMenu.querySelector('[aria-checked="true"]')||langMenu.querySelector('button')).focus();
+}
+langBtns.forEach(b=>b.addEventListener('click',e=>{ e.stopPropagation(); langMenu.hidden?openLang(b):closeLang(true); }));
+langMenu.addEventListener('click',e=>{ const b=e.target.closest('[data-lang]'); if(!b) return; if(b.dataset.lang===I18.lang){ closeLang(true); return; } I18.set?I18.set(b.dataset.lang):location.reload(); });
+langMenu.addEventListener('keydown',e=>{
+  const items=[...langMenu.querySelectorAll('button')], i=items.indexOf(document.activeElement);
+  if(e.key==='Escape'){ e.preventDefault(); closeLang(true); }
+  else if(e.key==='ArrowDown'||e.key==='ArrowUp'){ e.preventDefault(); items[(i+(e.key==='ArrowDown'?1:items.length-1))%items.length].focus(); }
+});
+document.addEventListener('click',e=>{ if(!langMenu.hidden&&!langMenu.contains(e.target)) closeLang(false); });
+addEventListener('resize',()=>closeLang(false));
+
 /* Hakkında */
 $('srcList').innerHTML=(SOURCES||[]).map(([t,u])=>`<li><a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a></li>`).join('');
 const openAbout=()=>{const d=$('about'); d.showModal?d.showModal():d.setAttribute('open','');};
@@ -949,17 +974,17 @@ function drawECG(){
   if(e&&r.vent!=='torsades'){
     const M=sim.MORPH[e.morph]||sim.MORPH.narrow, wide=M.J>0.1;
     let pk=0,pv=0; for(let d=0;d<M.J;d+=0.004){const v=sim.ecgAt(e.t+d); if(Math.abs(v)>Math.abs(pv)){pv=v;pk=d;}}
-    lab(wide?'QRS (geniş)':'QRS',X(e.t+pk),pv>0?base-pv*ppmv-6:base-pv*ppmv+14);
+    lab(wide?LG('QRS (geniş)','QRS (broad)'):'QRS',X(e.t+pk),pv>0?base-pv*ppmv-6:base-pv*ppmv+14);
     const tc=e.t+sim.qt(e.rr)+(M.qt||0)+M.T[0]; const tv=sim.ecgAt(tc);
     lab('T',X(tc),tv>=0?base-tv*ppmv-6:base-tv*ppmv+14);
   }
   if(r.atrial==='sinus'&&!['vf','torsades','vt','none'].includes(r.vent)&&(r.pAmp==null||r.pAmp>0.06)) sim.atrial.filter(a=>a.type==='sinus'&&a.t>t0&&a.t+0.12<sim.t).forEach(a=>{const v=sim.ecgAt(a.t+0.05); lab('P',X(a.t+0.05),base-Math.max(v,0.05)*ppmv-6);});
   const mid=(txt)=>{ if(lb==='all') lab(txt,W*0.5,H-10); };
-  if(r.atrial==='af') mid('f dalgaları: düzensiz taban çizgisi');
-  if(r.atrial==='flutter') mid('F dalgaları (testere dişi)');
-  if(r.vent==='vf') mid('Kaotik dalgalanma, QRS yok');
-  if(r.vent==='none') mid('Düz çizgi');
-  if(r.vent==='torsades') mid('Genliği dönerek değişen geniş QRS’ler');
+  if(r.atrial==='af') mid(LG('f dalgaları: düzensiz taban çizgisi','f waves: irregular baseline'));
+  if(r.atrial==='flutter') mid(LG('F dalgaları (testere dişi)','F waves (sawtooth)'));
+  if(r.vent==='vf') mid(LG('Kaotik dalgalanma, QRS yok','Chaotic undulation, no QRS'));
+  if(r.vent==='none') mid(LG('Düz çizgi','Flat line'));
+  if(r.vent==='torsades') mid(LG('Genliği dönerek değişen geniş QRS’ler','Broad QRS complexes with twisting amplitude'));
 }
 
 
