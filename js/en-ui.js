@@ -132,6 +132,7 @@ const UI={
 /* parts panel */
 'Bir parçaya tıklayınca:':'When you click a part:',
 'Seçilen parça':'Selected part',
+'Odaklansın':'Focus',
 'Parlasın':'Highlight',
 'Yalnız o kalsın':'Show only it',
 'Normal':'Normal',
