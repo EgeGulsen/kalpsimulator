@@ -8,7 +8,7 @@
 <meta name="description" content="Gerçek bir insan kalbi modelinde odacıkları, koroner dalları, venleri, ileti sistemini ve sinirleri tek tek incele; ritim bozukluklarını ve klinik durumları EKG ile izle.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Space+Grotesk:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Source+Serif+4:ital,opsz,wght@0,8..60,500;0,8..60,600;0,8..60,700;1,8..60,400&display=swap">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -17,6 +17,8 @@
   <div class="loading" id="loading"><span class="spin" aria-hidden="true"></span>3D kalp yükleniyor…</div>
   <div class="labels" id="labels"></div>
   <div class="tip" id="tip" hidden></div>
+  <div class="flash" id="flash" aria-hidden="true"></div>
+  <div class="txcap" id="txcap" hidden></div>
 </div>
 
 <header class="top">
@@ -26,6 +28,7 @@
     <a href="#durumlar" id="tab-durumlar">Durumlar</a>
     <a href="#ogren" id="tab-ogren">Öğren</a>
     <a href="#sina" id="tab-sina">Sına</a>
+    <a href="#vaka" id="tab-vaka">Vaka</a>
   </nav>
   <button class="iconbtn" id="btnAbout" type="button" aria-label="Hakkında ve kaynaklar">i</button>
 </header>
@@ -69,6 +72,7 @@
   <label class="tog"><input type="checkbox" id="t-cond" checked><span class="dot"></span>İleti</label>
   <label class="tog"><input type="checkbox" id="t-nerves" checked><span class="dot"></span>Sinirler</label>
   <label class="tog"><input type="checkbox" id="t-vessels" checked><span class="dot"></span>Damarlar</label>
+  <label class="tog torso-tog"><input type="checkbox" id="t-torso" checked><span class="dot"></span>Gövde</label>
   <button class="tog tbtn" id="btnParts" type="button" aria-pressed="false"><span class="dot"></span>Parçalar</button>
   <button class="btn" id="btnReset" type="button" title="Görünümü sıfırla" aria-label="Görünümü sıfırla">↺</button>
 </div>
@@ -91,6 +95,7 @@
 <script src="js/scenarios.js"></script>
 <script src="js/lessons.js"></script>
 <script src="js/quiz.js"></script>
+<script src="js/cases.js"></script>
 <script src="js/ecg12.js"></script>
 <script src="js/sim.js"></script>
 <script src="js/heart3d.js"></script>
