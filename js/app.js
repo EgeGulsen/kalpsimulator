@@ -28,7 +28,7 @@ try{
       const r=stage.getBoundingClientRect();
       tip.textContent=S[id]?S[id].n:id; tip.hidden=false; tip.style.left=(x-r.left)+'px'; tip.style.top=(y-r.top)+'px';
     },
-    onReady:()=>{loading.hidden=true; if(partsOpen){heart.setFocus(focusMode); renderParts();} heart.setTorso(torsoWanted()); if(mode==='ana'){applyHome3D();} else if(mode==='ogren'){applyLearn3D();} else if(mode==='sina'){applyQ3D();} else if(mode==='vaka'){applyV3D();} else heart.setMode(mode,mode==='durumlar'?COND[condKey]:null,condKey); heart.setXray(xray.checked); heart.select(selected); insets(); if(mode==='durumlar'&&(COND[condKey].fx||{}).infarct==='rca'){heart.viewFrom('inferior'); lastView=true;}},
+    onReady:()=>{loading.hidden=true; if(partsOpen){heart.setFocus(focusMode); renderParts();} heart.setTorso(torsoWanted()); if(mode==='ana'){applyHome3D();} else if(mode==='ogren'){applyLearn3D();} else if(mode==='sina'){applyQ3D();} else if(mode==='vaka'){applyV3D();} else heart.setMode(mode,mode==='durumlar'?COND[condKey]:null,condKey); heart.setXray(xray.checked); if(mode==='anatomi') applySys3D(); heart.select(selected); insets(); if(mode==='durumlar'&&(COND[condKey].fx||{}).infarct==='rca'){heart.viewFrom('inferior'); lastView=true;}},
     onError:()=>{loading.innerHTML='3D model yüklenemedi. Dosyayı doğrudan açtıysan bir yerel sunucu ile aç<br>(ör. <code>python3 -m http.server</code>).';}
   });
   stage.insertBefore(heart.canvas,stage.firstChild);
@@ -62,17 +62,73 @@ const seenDot=(k,id)=>`<span class="seen${isSeen(k,id)?' y':''}" aria-hidden="tr
 
 /* ---------- Sol liste ---------- */
 const nav=$('nav');
+/* Anatomi sistem sistem: bir sistem seçilir, kalpte o öne çıkar, liste yalnız onu gösterir */
+const CORO={lmca:1,lad:1,diag:1,ladrv:1,lcx:1,om:1,rca:1,conus:1,am:1,pda:1,rpl:1};
+const sysOf=id=>{const k=S[id]&&S[id].k; return k==='ileti'?'ileti':k==='sinir'?'sinir':k==='damar'?(CORO[id]?'kor':'ven'):'oda';};
+const SYS=[
+  {k:'oda',c:'#ff6b72',n:LG('Odacıklar ve kapaklar','Chambers and valves'),s:LG('Odacıklar','Chambers'),
+   d:LG('Dört odacık, septumlar, papiller kaslar ve dört kapak. Kanın kalbin içindeki yolunu ve kapakların hangi odacıklar arasında durduğunu buradan izle. Kapakları görmek için İçini göster’i aç.','The four chambers, the septa, the papillary muscles and the four valves. Follow the path of blood through the heart and see which chambers each valve sits between. Turn on Show inside to see the valves.')},
+  {k:'kor',c:'#e2525b',n:LG('Koroner arterler','Coronary arteries'),s:LG('Koronerler','Coronaries'),
+   d:LG('Sol ana koroner, LAD, sirkumfleks ve sağ koroner arter ile dalları. Hangi dalın kalbin hangi duvarını beslediğini ve tıkandığında EKG’de nerede iz bırakacağını bu katmanda öğren.','The left main, LAD, circumflex and right coronary arteries with their branches. Learn which branch supplies which wall of the heart and where its occlusion shows on the ECG.')},
+  {k:'ven',c:'#6f86d6',n:LG('Venler ve büyük damarlar','Veins and great vessels'),s:LG('Damarlar','Vessels'),
+   d:LG('Kalp venleri ve koroner sinüs, aort, pulmoner arter ve venler, vena cavalar. Kalbe giren ve çıkan büyük damarlar bu katmanda.','The cardiac veins and coronary sinus, the aorta, the pulmonary arteries and veins and the venae cavae: the great vessels entering and leaving the heart.')},
+  {k:'ileti',c:'#e0b400',n:LG('İleti sistemi','Conduction system'),s:LG('İleti','Conduction'),
+   d:LG('SA düğümden Purkinje liflerine kadar uyarının yolu. Miyokard saydamlaşır, yalnız ileti yolları parlak kalır.','The path of the impulse from the SA node to the Purkinje fibres. The myocardium turns transparent so only the conduction pathways stand out.')},
+  {k:'sinir',c:'#c9a300',n:LG('Otonom sinirler','Autonomic nerves'),s:LG('Sinirler','Nerves'),
+   d:LG('Vagus (parasempatik) ve sempatik lifler. Kalp hızını ve iletiyi nasıl ayarladıklarını bu katmanda gör.','Vagal (parasympathetic) and sympathetic fibres. See how they tune heart rate and conduction.')}];
+const SYSK=Object.fromEntries(SYS.map(x=>[x.k,x]));
+let asys='oda'; try{ const v=localStorage.getItem('kalp.asys'); if(SYSK[v]) asys=v; }catch(e){}
+const sysIds=k=>GROUPS.flatMap(g=>g[1]).filter(id=>S[id]&&sysOf(id)===k);
+const sysbar=$('sysbar');
+function renderSysbar(){
+  sysbar.innerHTML=SYS.map(x=>`<button type="button" data-sys="${x.k}" aria-pressed="${x.k===asys}" title="${esc(x.n)}"><i style="background:${x.c}"></i><span class="sl">${esc(x.n)}</span><span class="ss">${esc(x.s)}</span></button>`).join('');
+}
+function applySys3D(){
+  if(!heart||!heart.ready||mode!=='anatomi') return;
+  const k=asys;
+  heart.setLayer('cond',k==='ileti'); heart.setLayer('nerves',k==='sinir'); heart.setLayer('vessels',true);
+  xray.checked=k==='ileti';
+  heart.setXray(xray.checked);
+  const dim={};
+  for(const pt of heart.parts()){ const ps=S[pt.id]?sysOf(pt.id):pt.kind==='ileti'?'ileti':pt.kind==='sinir'?'sinir':pt.kind==='damar'?'ven':'oda';
+    if(ps===k) continue;
+    if(pt.kind==='damar') dim[pt.id]=k==='oda'?0.45:0.16;
+    else if(pt.kind==='kas'&&(k==='kor'||k==='ven')) dim[pt.id]=1;
+  }
+  heart.setDim(dim);
+}
+function leaveSys3D(){ if(!heart||!heart.ready) return; heart.setDim({}); [['t-cond','cond'],['t-nerves','nerves'],['t-vessels','vessels']].forEach(([id,k])=>heart.setLayer(k,$(id).checked)); }
+function setSys(k,keep){
+  if(!SYSK[k]) return; asys=k; try{ localStorage.setItem('kalp.asys',k); }catch(e){}
+  if(!keep&&selected&&sysOf(selected)!==k){ selected=null; heart&&heart.select(null); }
+  renderSysbar(); applySys3D(); if(mode==='anatomi'){ render(); renderNav(); }
+}
+sysbar.addEventListener('click',e=>{ const b=e.target.closest('[data-sys]'); if(b) setSys(b.dataset.sys); });
+renderSysbar();
 function navAnatomy(){
   const q=LC(query.trim());
   const hit=id=>!q||LC(S[id].n+' '+(S[id].l||'')).includes(q);
-  let html=progHTML('a',Object.keys(S),'İncelenen yapı')+`<input class="search" id="search" type="search" placeholder="Yapı ara: ör. diyagonal, koroner sinüs" value="${esc(query)}" aria-label="Yapı ara">`;
-  let any=false;
-  for(const [g,ids] of GROUPS){
-    const vis=ids.filter(hit); if(!vis.length) continue; any=true;
-    html+=`<div class="grp-h">${esc(g)}<span>${vis.length}</span></div>`;
-    html+=vis.map(id=>`<button class="item${S[id].p?' sub':''}" type="button" data-id="${id}" aria-current="${id===selected}"><i class="k" style="background:${dotCol(id)}"></i>${esc(S[id].n)}${seenDot('a',id)}</button>`).join('');
+  const X=SYSK[asys], mine=sysIds(asys);
+  let html=progHTML('a',mine,X.n)+`<input class="search" id="search" type="search" placeholder="Tüm kalpte ara: ör. diyagonal, AV düğüm" value="${esc(query)}" aria-label="Yapı ara">`;
+  const item=(id,cls,x)=>`<button class="item${cls}" type="button" data-id="${id}" aria-current="${id===selected}"><i class="k" style="background:${dotCol(id)}"></i>${esc(S[id].n)}${x||''}${seenDot('a',id)}</button>`;
+  if(q){ // arama tüm sistemlerde
+    let any=false;
+    for(const x of SYS){ const vis=sysIds(x.k).filter(hit); if(!vis.length) continue; any=true;
+      html+=`<div class="grp-h">${esc(x.n)}<span>${vis.length}</span></div>`+vis.map(id=>item(id,S[id].p?' sub':'')).join(''); }
+    if(!any) html+=`<p class="grp-h">Sonuç yok</p>`;
+    return html;
   }
-  if(!any) html+=`<p class="grp-h">Sonuç yok</p>`;
+  const openP=selected&&(S[selected].p||selected);
+  for(const [g,ids] of GROUPS){
+    const vis=ids.filter(id=>S[id]&&sysOf(id)===asys); if(!vis.length) continue;
+    html+=`<div class="grp-h">${esc(g)}<span>${vis.length}</span></div>`;
+    for(const id of vis){
+      const par=S[id].p, parListed=par&&vis.includes(par);
+      if(parListed){ if(openP===par) html+=item(id,' sub'); continue; }
+      const kids=vis.filter(c=>S[c].p===id);
+      html+=kids.length?item(id,' haskids'+(openP===id?' open':''),`<small class="kc">${openP===id?'':'+'+kids.length}</small>`):item(id,par?' sub':'');
+    }
+  }
   return html;
 }
 let navOpen=false;
@@ -84,7 +140,7 @@ function renderNav(){
   const ae=document.activeElement&&document.activeElement.id==='search', pos=ae?$('search').selectionStart:0;
   if(mode==='ana'){ nav.innerHTML=''; return; }
   nav.innerHTML= mode==='anatomi'?navAnatomy():mode==='ogren'?navLearn():mode==='sina'?navQuiz():mode==='vaka'?navVaka():navConds();
-  if(ae){const s=$('search'); s.focus(); s.setSelectionRange(pos,pos);}
+  if(ae){const s=$('search'); if(s){ s.focus(); s.setSelectionRange(pos,pos);} }
 }
 nav.addEventListener('input',e=>{if(e.target.id==='search'){query=e.target.value; renderNav();}});
 nav.addEventListener('click',e=>{
@@ -105,12 +161,13 @@ const card=$('card');
 function kindHTML(k){return `<span class="kind"><b style="background:${KCOL[k]||'#888'}"></b>${KIND[k]||''}</span>`;}
 const closeBtn=`<button class="x" id="cardX" type="button" aria-label="Kartı kapat">×</button>`;
 function anatomyHTML(){
-  if(!selected) return `${closeBtn}<div><div class="eyebrow">Anatomi</div><h2>Kalp anatomisi</h2></div>
-    <p>Model, gerçek bir insan kalbinin BodyParts3D taramasından üretildi. Odacıklar, kapaklar, koroner arter dalları, kardiyak venler, ileti sistemi ve otonom sinirler ayrı ayrı seçilebilir. Her yapının Latince adı, kanlanması ve klinik önemi burada açılır.</p>
-    <p>Sürükleyerek çevir, kaydırarak yakınlaştır, bir yapıya tıklayarak seç. <b>İçini göster</b> miyokardı saydamlaştırıp ileti sistemini ortaya çıkarır; <b>Parçalar</b> tek tek gizleme ve izole etme sağlar.</p>
-    <div class="legend"><span><i class="sw" style="background:var(--cond)"></i>İleti sistemi</span><span><i class="sw" style="background:repeating-linear-gradient(90deg,var(--cond) 0 5px,transparent 5px 9px)"></i>Otonom sinir</span><span><i class="sw" style="background:#d8414a"></i>Arter</span><span><i class="sw" style="background:#5a5fb4"></i>Ven</span></div>
-    <div class="actions"><button class="bigbtn" type="button" data-anext="${GROUPS[0][1][0]}">İlk yapıdan başla<small>${esc(S[GROUPS[0][1][0]].n)}</small></button></div>
-    <div class="disc">Toplam ${Object.keys(S).length} yapı. Soldaki listeden ya da arama kutusundan da seçebilirsin.</div>`;
+  if(!selected){ const X=SYSK[asys], mine=sysIds(asys), i=SYS.indexOf(X), nx=SYS[(i+1)%SYS.length], first=mine.find(id=>!isSeen('a',id))||mine[0];
+    return `${closeBtn}<div><div class="eyebrow">${LG('Anatomi','Anatomy')} · ${i+1}/${SYS.length}</div><h2>${esc(X.n)}</h2></div>
+    <p>${esc(X.d)}</p>
+    <p class="hint2">${LG('Kalbi sürükleyerek çevir, bir yapıya tıklayarak seç. Üstteki düğmelerden başka bir sisteme geçebilirsin.','Drag to rotate the heart and click a structure to select it. Use the buttons at the top to switch to another system.')}</p>
+    <div class="actions"><button class="bigbtn" type="button" data-anext="${first}">${mine.some(id=>isSeen('a',id))?LG('Devam et','Continue'):LG('Bu sistemi başlat','Start this system')}<small>${esc(S[first].n)}</small></button>
+      <button class="lnk" type="button" data-sys="${nx.k}">${LG('Sonraki sistem','Next system')}: ${esc(nx.n)} →</button></div>
+    <div class="disc">${LG(`Bu sistemde ${mine.length} yapı var.`,`${mine.length} structures in this system.`)}</div>`; }
   const s=S[selected], par=s.p&&S[s.p];
   const kids=Object.keys(S).filter(k=>S[k].p===selected);
   const sibs=par?Object.keys(S).filter(k=>S[k].p===s.p&&k!==selected):[];
@@ -119,7 +176,7 @@ function anatomyHTML(){
   if(s.b) more+=`<div><dt>Kanlanma</dt><dd>${esc(s.b)}</dd></div>`;
   if(s.c) more+=`<div><dt>Klinik önemi</dt><dd>${esc(s.c)}</dd></div>`;
   const chip=id=>`<button type="button" data-id="${id}">${esc(S[id].n)}</button>`;
-  const ord=GROUPS.flatMap(g=>g[1]).filter(x=>S[x]), anext=ord[ord.indexOf(selected)+1];
+  const ord=sysIds(sysOf(selected)), anext=ord[ord.indexOf(selected)+1], nsys=!anext&&SYS[(SYS.findIndex(x=>x.k===sysOf(selected))+1)%SYS.length];
   return `${closeBtn}
     ${par?`<div class="crumb"><button type="button" data-id="${s.p}">${esc(par.n)}</button><span>›</span></div>`:''}
     <div>${kindHTML(s.k)}<h2>${esc(s.n)}</h2><div class="latin">${esc(s.l||'')}</div></div>
@@ -128,7 +185,7 @@ function anatomyHTML(){
     ${s.note?`<div class="note">${esc(s.note)}</div>`:''}
     ${kids.length?`<div><div class="eyebrow" style="margin-bottom:6px">Dalları ve bölümleri</div><div class="chips">${kids.map(chip).join('')}</div></div>`:''}
     ${sibs.length?`<div><div class="eyebrow" style="margin-bottom:6px">Komşu dallar</div><div class="chips">${sibs.map(chip).join('')}</div></div>`:''}
-    ${anext?`<div class="actions"><button class="bigbtn" type="button" data-anext="${anext}">Sonraki yapı<small>${esc(S[anext].n)}</small></button></div>`:''}`;
+    ${anext?`<div class="actions"><button class="bigbtn" type="button" data-anext="${anext}">Sonraki yapı<small>${esc(S[anext].n)}</small></button></div>`:`<div class="actions"><button class="bigbtn" type="button" data-sys="${nsys.k}">${LG('Sistem bitti, sonraki sistem','System done, next system')}<small>${esc(nsys.n)}</small></button></div>`}`;
 }
 function stateOf(id){
   const c=COND[condKey], k=S[id].k, fx=c.fx||{};
@@ -187,6 +244,7 @@ card.addEventListener('click',e=>{
   const gc=e.target.closest('[data-gocase]'); if(gc){ location.hash='#vaka/'+gc.dataset.gocase; return; }
   if(e.target.closest('[data-condnext]')){ markSeen('d',condKey); const order=CATS.flatMap(([k])=>Object.keys(COND).filter(x=>COND[x].cat===k)); setCond(order[(order.indexOf(condKey)+1)%order.length]); card.scrollTop=0; return; }
   const an=e.target.closest('[data-anext]'); if(an){ select(an.dataset.anext); card.scrollTop=0; return; }
+  const sy=e.target.closest('[data-sys]'); if(sy){ markSeen('a',selected); setSys(sy.dataset.sys); card.scrollTop=0; return; }
   const ln=e.target.closest('[data-lnext]'); if(ln){ markSeen('l',lesson); setLesson(ln.dataset.lnext); card.scrollTop=0; return; }
   if(mode==='vaka'){ const rx=e.target.closest('[data-rx]'); if(rx){ rxApply(+rx.dataset.rx); return; }
     if(e.target.closest('[data-hedit]')){ const src=e.target.closest('[data-hedit]'); if(vk.custom){ hb.cond=vk.custom.cond; } openFlip(src,'new'); return; }
@@ -203,11 +261,11 @@ card.addEventListener('click',e=>{
   const ls=e.target.closest('[data-lesson]'); if(ls){ setLesson(ls.dataset.lesson); card.scrollTop=0; return; }
   const b=e.target.closest('[data-id]'); if(b) select(b.dataset.id);
 });
-card.addEventListener('input',e=>{ if(e.target.id==='faqq'){ faqQ=e.target.value; const q=LC(faqQ.trim()); card.querySelectorAll('.faq details').forEach(d=>{d.hidden=!!q&&!d.textContent.toLocaleLowerCase('tr').includes(q);}); card.querySelectorAll('.faqg').forEach(g=>{g.hidden=!g.querySelector('details:not([hidden])');}); } });
+card.addEventListener('input',e=>{ if(e.target.id==='faqq'){ faqQ=e.target.value; const q=LC(faqQ.trim()); card.querySelectorAll('.faq details').forEach(d=>{d.hidden=!!q&&!LC(d.textContent).includes(q);}); card.querySelectorAll('.faqg').forEach(g=>{g.hidden=!g.querySelector('details:not([hidden])');}); } });
 function openCard(){ if(!cardOpen){cardOpen=true; card.classList.remove('hide'); insets();} }
 function select(id){
   if(id&&!S[id]) id=null;
-  selected=id; if(mode==='anatomi') markSeen('a',id); heart&&heart.select(id); render(); renderNav();
+  selected=id; if(mode==='anatomi'){ markSeen('a',id); if(id&&sysOf(id)!==asys) setSys(sysOf(id),true); } heart&&heart.select(id); render(); renderNav();
   if(id&&narrow()&&mode==='anatomi') card.scrollIntoView({behavior:reduce?'auto':'smooth',block:'nearest'});
 }
 
@@ -419,6 +477,7 @@ document.querySelectorAll('[data-speed]').forEach(b=>b.addEventListener('click',
 
 function setMode(m){
   const prev=mode; mode=m; document.body.classList.remove('qtext'); document.body.dataset.mode=m;
+  if(prev==='anatomi'&&m!=='anatomi') leaveSys3D();
   document.body.classList.remove('deck'); deckEl.hidden=true; if(flip) closeFlip();
   ['anatomi','durumlar','ogren','sina','vaka'].forEach(k=>{const a=$('tab-'+k); if(k===m)a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current');});
   if(m==='ana') $('brand').setAttribute('aria-current','page'); else $('brand').removeAttribute('aria-current');
@@ -451,7 +510,7 @@ function setMode(m){
   } else {
     monitor.classList.remove('show','swap');
     if(lastView&&heart){heart.resetView(); lastView=false;}
-    heart&&heart.setMode('anatomi');
+    heart&&heart.setMode('anatomi'); applySys3D();
     render(); renderNav();
   }
   if(m!=='vaka') vkStop();

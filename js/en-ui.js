@@ -66,6 +66,8 @@ const UI={
 'Sonuç yok':'No results',
 'Yapı ara: ör. diyagonal, koroner sinüs':'Search structures: e.g. diagonal, coronary sinus',
 'Yapı ara':'Search structures',
+'Tüm kalpte ara: ör. diyagonal, AV düğüm':'Search the whole heart: e.g. diagonal, AV node',
+'Sistem':'System',
 /* anatomy card */
 'Kalp anatomisi':'Cardiac anatomy',
 'Model, gerçek bir insan kalbinin BodyParts3D taramasından üretildi. Odacıklar, kapaklar, koroner arter dalları, kardiyak venler, ileti sistemi ve otonom sinirler ayrı ayrı seçilebilir. Her yapının Latince adı, kanlanması ve klinik önemi burada açılır.':'The model was built from a BodyParts3D scan of a real human heart. Chambers, valves, coronary artery branches, cardiac veins, the conduction system and autonomic nerves can each be selected. The Latin name, blood supply and clinical significance of every structure open here.',
