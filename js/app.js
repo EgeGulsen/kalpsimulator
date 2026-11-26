@@ -89,6 +89,7 @@ nav.addEventListener('click',e=>{
   if(e.target.closest('[data-navtog]')){ navOpen=!navOpen; nav.classList.toggle('open',navOpen); renderNav(); return; }
   const vl=e.target.closest('[data-vlv]'); if(vl){ setVLevel(+vl.dataset.vlv); return; }
   const vc=e.target.closest('[data-vcase]'); if(vc){ openCard(); startCase(vc.dataset.vcase); return; }
+  if(e.target.closest('[data-vdeck]')){ vk.id=null; vk.custom=null; vkStop(); if(history.replaceState) history.replaceState(null,'','#vaka'); applyV3D(); render(); renderNav(); return; }
   const qt=e.target.closest('[data-qtype]'); if(qt){ setQType(qt.dataset.qtype); return; }
   if(e.target.closest('[data-qreset]')){ quiz.score={}; quiz.streak=0; saveScore(); renderNav(); render(); return; }
   const b=e.target.closest('[data-id],[data-cond],[data-lesson]'); if(!b) return;
@@ -173,6 +174,7 @@ function condHTML(){
 let bA=null,bV=null;
 function render(){
   if(mode==='ana'){ renderHome(); return; }
+  const dk=mode==='vaka'&&!vk.id; document.body.classList.toggle('deck',dk); deckEl.hidden=!dk; if(dk) renderDeck();
   card.innerHTML = mode==='anatomi'?anatomyHTML():mode==='ogren'?learnHTML():mode==='sina'?quizHTML():mode==='vaka'?vakaHTML():condHTML();
   bA=$('bA'); bV=$('bV');
   card.classList.toggle('hide',!cardOpen);
@@ -184,12 +186,14 @@ card.addEventListener('click',e=>{
   if(e.target.closest('[data-condnext]')){ markSeen('d',condKey); const order=CATS.flatMap(([k])=>Object.keys(COND).filter(x=>COND[x].cat===k)); setCond(order[(order.indexOf(condKey)+1)%order.length]); card.scrollTop=0; return; }
   const an=e.target.closest('[data-anext]'); if(an){ select(an.dataset.anext); card.scrollTop=0; return; }
   const ln=e.target.closest('[data-lnext]'); if(ln){ markSeen('l',lesson); setLesson(ln.dataset.lnext); card.scrollTop=0; return; }
-  if(mode==='vaka'){ const va=e.target.closest('[data-va]'); if(va){ vkAnswer(+va.dataset.va); return; }
+  if(mode==='vaka'){ const rx=e.target.closest('[data-rx]'); if(rx){ rxApply(+rx.dataset.rx); return; }
+    if(e.target.closest('[data-hedit]')){ const src=e.target.closest('[data-hedit]'); if(vk.custom){ hb.cond=vk.custom.cond; } openFlip(src,'new'); return; }
+    const va=e.target.closest('[data-va]'); if(va){ vkAnswer(+va.dataset.va); return; }
     const vl=e.target.closest('[data-vlv]'); if(vl){ setVLevel(+vl.dataset.vlv); return; }
     if(e.target.closest('[data-vstart]')){ startCase(e.target.closest('[data-vstart]').dataset.vstart||null); return; }
     if(e.target.closest('[data-vnext]')){ vkNext(); return; }
     if(e.target.closest('[data-vhint]')){ vkHint(); return; }
-    if(e.target.closest('[data-vmenu]')){ vk.id=null; vkStop(); applyV3D(); render(); renderNav(); return; } }
+    if(e.target.closest('[data-vmenu]')){ vk.id=null; vk.custom=null; vkStop(); if(history.replaceState) history.replaceState(null,'','#vaka'); applyV3D(); render(); renderNav(); return; } }
   if(mode==='sina'){ const qa=e.target.closest('[data-qa]'); if(qa){ quizAnswer(+qa.dataset.qa); return; }
     if(e.target.closest('[data-qnext]')){ newQ(); return; }
     if(e.target.closest('[data-qgive]')){ quizReveal(); return; } }
@@ -413,6 +417,7 @@ document.querySelectorAll('[data-speed]').forEach(b=>b.addEventListener('click',
 
 function setMode(m){
   const prev=mode; mode=m; document.body.classList.remove('qtext'); document.body.dataset.mode=m;
+  document.body.classList.remove('deck'); deckEl.hidden=true; if(flip) closeFlip();
   ['anatomi','durumlar','ogren','sina','vaka'].forEach(k=>{const a=$('tab-'+k); if(k===m)a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current');});
   if(m==='ana') $('brand').setAttribute('aria-current','page'); else $('brand').removeAttribute('aria-current');
   $('home').hidden=m!=='ana'; heart&&heart.setSpin&&heart.setSpin(m==='ana'&&!reduce);
@@ -577,7 +582,7 @@ document.addEventListener('keydown',e=>{
 
 /* ---------- Gövde (yalnız senaryolarda ve vakalarda) ---------- */
 const tTorso=$('t-torso');
-function torsoWanted(){ return (mode==='durumlar'||mode==='vaka')&&tTorso.checked; }
+function torsoWanted(){ return (mode==='durumlar'||(mode==='vaka'&&vk.id))&&tTorso.checked; }
 tTorso.addEventListener('change',()=>heart&&heart.setTorso(torsoWanted()));
 function ecgKey(){ return mode==='sina'&&quiz.cur?quiz.cur.key:mode==='vaka'&&vk.id?vk.cur:condKey; }
 function ecgLabels(){
@@ -593,11 +598,13 @@ function vkSave(){ try{ localStorage.setItem('kalp.vaka',JSON.stringify({lv:vk.l
 const LVN=l=>(LEVELS.find(x=>x.id===l)||{}).n||'';
 const caseOf=id=>CASES.find(c=>c.id===id);
 const HINT_COST={1:0,2:2,3:3};
-function setVLevel(l){ vk.lv=l; vkSave(); if(vk.id&&!vk.fin) startCase(vk.id); else { render(); renderNav(); } }
-function condForCase(){ const c=COND[vk.cur]; if(vk.dx||vk.lv===1||vk.cur!==caseOf(vk.id).cond) return c; return Object.assign({},c,{fx:{}}); }
+function setVLevel(l){ vk.lv=l; vkSave(); if(vk.id&&vk.id!=='ozel'&&!vk.fin) startCase(vk.id); else { render(); renderNav(); } }
+function condForCase(){ const c=COND[vk.cur]; if(vk.id==='ozel'||vk.dx||vk.lv===1||vk.cur!==caseOf(vk.id).cond) return c; return Object.assign({},c,{fx:{}}); }
 function applyV3D(){
   if(mode!=='vaka') return;
-  if(!vk.id){ monitor.classList.remove('show','swap'); sim.setCondition('nsr'); if(heart&&heart.ready){ heart.setMode('durumlar',COND.nsr,'nsr'); heart.setXray(false); } insets(); return; }
+  heart&&heart.setSpin&&heart.setSpin(!vk.id&&!reduce);
+  if(!vk.id){ monitor.classList.remove('show','swap'); sim.setCondition('nsr'); if(heart&&heart.ready){ heart.setMode('durumlar',COND.nsr,'nsr'); heart.setXray(false); heart.setTorso(false); heart.resetView(); } insets(); return; }
+  heart&&heart.ready&&heart.setTorso(torsoWanted());
   sim.setCondition(vk.cur); $('lead').textContent=COND[vk.cur].lead||'DII'; $('monName').textContent=vk.dx?COND[vk.cur].n:'Monitör';
   if(!monitor.classList.contains('show')) requestAnimationFrame(()=>{monitor.classList.add('show'); setTimeout(()=>{sizeCanvas(); insets();},650);});
   if(heart&&heart.ready){ heart.setMode('durumlar',condForCase(),vk.cur); heart.setXray(xray.checked); }
@@ -605,7 +612,7 @@ function applyV3D(){
 }
 function startCase(id){
   const pool=CASES.filter(c=>c.id!==vk.id); const c=id?caseOf(id):pool[Math.floor(Math.random()*pool.length)]; if(!c) return;
-  vkStop(); vk.id=c.id; vk.cur=c.cond; vk.dx=false; vk.si=0; vk.fin=false; vk.busy=false; vk.flags=new Set(); vk.hintLeft=1;
+  vkStop(); vk.custom=null; vk.id=c.id; vk.cur=c.cond; vk.dx=false; vk.si=0; vk.fin=false; vk.busy=false; vk.flags=new Set(); vk.hintLeft=1;
   const nWrong={1:2,2:3,3:99}[vk.lv];
   vk.steps=c.steps.filter(st=>st.lv<=vk.lv).map(st=>{ const ok=st.o.filter(o=>o[1]), wr=st.o.filter(o=>!o[1]).slice(0,nWrong); return Object.assign({},st,{opts:shuffle(ok.concat(wr))}); });
   vk.res=vk.steps.map(()=>({wrong:[],hints:vk.lv===1?1:0,done:false,ok:false,pts:0}));
@@ -648,7 +655,7 @@ function vkNext(){
 function navVaka(){
   return `<div class="grp-h">Seviye</div><div class="vlv" role="group" aria-label="Detay seviyesi">${LEVELS.map(l=>`<button type="button" data-vlv="${l.id}" aria-pressed="${vk.lv===l.id}">${esc(l.n)}</button>`).join('')}</div>
     <p class="vlvd">${esc((LEVELS.find(l=>l.id===vk.lv)||{}).d||'')}</p>
-    <div class="grp-h">Vakalar<span>${CASES.length}</span></div>`+
+    <div class="grp-h">Vakalar<span>${CASES.length}</span></div>`+(vk.id?`<button class="item" type="button" data-vdeck>← Vaka destesi</button>`:'')+
     CASES.map((c,i)=>{ const b=vk.best[c.id]&&vk.best[c.id][vk.lv]; return `<button class="item qitem" type="button" data-vcase="${c.id}" aria-current="${c.id===vk.id}"><span>Vaka ${i+1}<em>${esc(c.brief)}</em></span>${b!=null?`<small>%${b}</small>`:''}</button>`; }).join('');
 }
 function chip(it){ const [t,id]=it, hit=id&&vk.flags.has(id); return `<span class="pchip${hit?' hit':''}">${esc(t)}</span>`; }
@@ -665,6 +672,7 @@ function patientHTML(c){
   </details>`;
 }
 function vakaHTML(){
+  if(vk.id==='ozel'&&vk.custom) return customHTML();
   if(!vk.id){
     return `${closeBtn}<div><div class="eyebrow">Vaka simülatörü</div><h2>Hastayı sen yönet</h2></div>
       <p>Her vakada bir hasta gelir: yaşı, kilosu, kronik hastalıkları, ilaçları ve alerjileriyle. Monitördeki EKG’den tanıyı koyar, sonra ne yapılacağına karar verirsin. Doğru tedavi seçildiğinde gövdenin içindeki kalpte canlandırılır: şok, kateterle damarın açılması, damardan ilaç…</p>
@@ -712,6 +720,155 @@ document.addEventListener('keydown',e=>{
   else if(e.key==='Enter'&&r.done&&!vk.busy&&!e.target.closest('button,a')){ vkNext(); e.preventDefault(); }
 });
 
+/* ---------- Vaka destesi: ters kartlar, çevirerek açılan ekran ---------- */
+const {HASTA,HASTA_ALL,evalRx}=window.KALP;
+const deckEl=$('deck');
+const CARDSVG=`<svg class="dc-ecg" viewBox="0 0 200 40" preserveAspectRatio="none" aria-hidden="true"><path d="M0 24h40l6-4 6 4h12l4 8 7-30 7 34 5-12h18l8-7 8 7h69" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+const PLUS=`<svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>`;
+function backFace(kind,i){
+  if(kind==='new') return `<div class="dc-back new"><span class="dc-k">Yeni</span><i class="dc-plus">${PLUS}</i><b>Senaryo oluştur</b><span class="dc-s">Hastanı oluştur, hastalığı seç, tedavileri dene</span></div>`;
+  const c=CASES[i], b=vk.best[c.id]&&vk.best[c.id][vk.lv];
+  return `<div class="dc-back"><span class="dc-k">Vaka ${i+1}</span>${CARDSVG}<b>${esc(c.brief.split(' · ')[0])}</b><span class="dc-s">${esc(c.brief.split(' · ').slice(1).join(' · '))}</span>${b!=null?`<span class="dc-best">%${b}</span>`:''}</div>`;
+}
+function renderDeck(){
+  deckEl.innerHTML=`<div class="dk-head"><div><div class="eyebrow">Vaka simülatörü</div><h1>Bir kart çek</h1><p>Kartı çevir, hastayı tanı, kararları sen ver. Ya da kendi hastanı oluştur.</p></div>
+    <div class="dk-ctl"><div class="vlv" role="group" aria-label="Detay seviyesi">${LEVELS.map(l=>`<button type="button" data-vlv="${l.id}" aria-pressed="${vk.lv===l.id}">${esc(l.n)}</button>`).join('')}</div>
+    <p class="vlvd">${esc((LEVELS.find(l=>l.id===vk.lv)||{}).d||'')}</p></div></div>
+    <div class="dk-grid">${CASES.map((c,i)=>`<button type="button" class="dcard" data-flip="${c.id}" aria-label="Vaka ${i+1}: ${esc(c.brief)}">${backFace('case',i)}</button>`).join('')}
+    <button type="button" class="dcard" data-flip="new" aria-label="Senaryo oluştur: kendi hastanı oluştur">${backFace('new')}</button></div>`;
+}
+deckEl.addEventListener('click',e=>{
+  const vl=e.target.closest('[data-vlv]'); if(vl){ vk.lv=+vl.dataset.vlv; vkSave(); renderDeck(); renderNav(); return; }
+  const f=e.target.closest('[data-flip]'); if(f) openFlip(f,f.dataset.flip);
+});
+
+/* Kart çevirme: kart kendi yerinden ekranın ortasına büyürken 180° döner, arka yüzde ekran açılır */
+let flip=null;
+function flipTarget(){ const m=narrow()?10:28, W=Math.min(innerWidth-2*m,flip&&flip.kind==='new'?1040:620), H=Math.min(innerHeight-2*m,flip&&flip.kind==='new'?760:700); return {left:(innerWidth-W)/2,top:(innerHeight-H)/2,width:W,height:H}; }
+function openFlip(src,kind){
+  if(flip) return;
+  const r=src.getBoundingClientRect(), i=CASES.findIndex(c=>c.id===kind);
+  const ov=document.createElement('div'); ov.className='flipov'; ov.setAttribute('role','dialog'); ov.setAttribute('aria-modal','true');
+  ov.innerHTML=`<div class="flipcard"><div class="fc-face fc-backface">${kind==='new'?backFace('new'):backFace('case',i)}</div><div class="fc-face fc-front" tabindex="-1"></div></div>`;
+  document.body.appendChild(ov);
+  flip={ov,src,kind,el:ov.querySelector('.flipcard'),front:ov.querySelector('.fc-front')};
+  fillFront();
+  const T=flipTarget(), from={left:r.left+'px',top:r.top+'px',width:r.width+'px',height:r.height+'px',transform:'rotateY(0deg)'}, to={left:T.left+'px',top:T.top+'px',width:T.width+'px',height:T.height+'px',transform:'rotateY(180deg)'};
+  Object.assign(flip.el.style,to);
+  src.style.visibility='hidden';
+  const mid={left:(r.left*.55+T.left*.45)+'px',top:(r.top*.55+T.top*.45-24)+'px',width:(r.width*.6+T.width*.4)+'px',height:(r.height*.6+T.height*.4)+'px',transform:'rotateY(-12deg)',offset:.42,easing:'cubic-bezier(.5,0,.3,1)'};
+  if(!reduce){ flip.el.animate([Object.assign({easing:'cubic-bezier(.3,0,.3,1)'},from),mid,to],{duration:950}); ov.animate([{backgroundColor:'transparent'},{}],{duration:450}); }
+  setTimeout(()=>flip&&flip.front.focus({preventScroll:true}),reduce?0:950);
+}
+function closeFlip(after){
+  if(!flip) return; const f=flip; flip=null;
+  const done=()=>{ f.ov.remove(); f.src.style.visibility=''; after&&after(); };
+  if(reduce||after){ if(after){ f.ov.animate([{opacity:1},{opacity:0}],{duration:reduce?0:220}).onfinish=done; } else done(); return; }
+  const r=f.src.getBoundingClientRect(), cur=f.el.getBoundingClientRect();
+  f.el.animate([{left:cur.left+'px',top:cur.top+'px',width:cur.width+'px',height:cur.height+'px',transform:'rotateY(180deg)'},{left:r.left+'px',top:r.top+'px',width:r.width+'px',height:r.height+'px',transform:'rotateY(0deg)'}],{duration:560,easing:'cubic-bezier(.4,0,.2,1)',fill:'forwards'}).onfinish=done;
+  f.ov.animate([{},{backgroundColor:'transparent'}],{duration:560,fill:'forwards'});
+}
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&flip){ closeFlip(); e.preventDefault(); } });
+window.addEventListener('resize',()=>{ if(flip) Object.assign(flip.el.style,Object.fromEntries(Object.entries(flipTarget()).map(([k,v])=>[k,v+'px']))); });
+
+function fillFront(){
+  const f=flip; if(!f) return;
+  const x=`<button class="x fc-x" type="button" data-fclose aria-label="Kartı kapat">×</button>`;
+  if(f.kind==='new'){ f.front.innerHTML=x+builderHTML(); f.front.classList.add('builder'); return; }
+  const i=CASES.findIndex(c=>c.id===f.kind), c=CASES[i], b=vk.best[c.id]&&vk.best[c.id][vk.lv], n=c.steps.filter(s=>s.lv<=vk.lv).length;
+  const save={id:vk.id,flags:vk.flags,si:vk.si,fin:vk.fin}; vk.flags=new Set(); vk.si=0; vk.fin=true; // hasta kartını açık ve vurgusuz çiz
+  const ph=patientHTML(c); Object.assign(vk,save);
+  f.front.innerHTML=`${x}<div class="fc-in"><div><div class="pills"><span class="pill g">Vaka ${i+1}</span><span class="pill">${esc(LVN(vk.lv))} · ${n} karar</span>${b!=null?`<span class="pill r">En iyi %${b}</span>`:''}</div>
+    <h2>${esc(c.brief)}</h2></div>${ph}
+    <div class="actions"><button class="bigbtn" type="button" data-fstart="${c.id}">Vakayı başlat<small>Monitör bağlanıyor</small></button><button class="lnk" type="button" data-fclose>Başka kart seç</button></div></div>`;
+}
+
+/* ---------- Hasta ve senaryo oluştur ---------- */
+const hb={yas:62,cins:'Erkek',kilo:78,boy:174,cond:'af',sel:new Set(),ek:''};
+try{ const sv=JSON.parse(localStorage.getItem('kalp.hasta')||'null'); if(sv){ Object.assign(hb,sv,{sel:new Set(sv.sel||[])}); if(!COND[hb.cond]) hb.cond='af'; } }catch(e){}
+function hbSave(){ try{ localStorage.setItem('kalp.hasta',JSON.stringify(Object.assign({},hb,{sel:[...hb.sel]}))); }catch(e){} }
+const P0=()=>({yas:+hb.yas||0,kilo:+hb.kilo||0,boy:+hb.boy||0,cins:hb.cins,sel:hb.sel});
+const STN={ok:['Uygun','g'],info:['Not','b'],warn:['Dikkat','a'],no:['Kontrendike','r']};
+function rxHTML(cond,P,apply){
+  const L=evalRx(cond,P); if(!L.length) return '<p class="rx-none">Bu tablo için tanımlı tedavi yok.</p>';
+  const order={no:3,warn:2,info:1,ok:0}, list=L.slice().sort((a,b)=>(b.first?1:0)-(a.first?1:0)||order[a.st]-order[b.st]);
+  return `<ul class="rx">${list.map(r=>`<li class="rx-i st-${r.st}"><div class="rx-h"><span><b>${esc(r.n)}</b>${r.first?'<em class="rx-1">İlk basamak</em>':''}<small>${esc(r.cls||'')}</small></span><span class="rx-st ${STN[r.st][1]}">${STN[r.st][0]}</span></div>
+    ${r.dose&&r.dose!=='—'?`<div class="rx-d">${esc(r.dose)}</div>`:''}${r.note?`<div class="rx-n">${esc(r.note)}</div>`:''}
+    ${r.why.length?`<ul class="rx-w">${r.why.map(([l,w,k])=>`<li class="w-${l}">${k&&HASTA_ALL[k]?`<b>${esc(HASTA_ALL[k].split(' (')[0])}:</b> `:''}${esc(w)}</li>`).join('')}</ul>`:''}
+    ${apply?vk.custom.log.filter(l=>l.i===r.i).slice(-1).map(l=>`<div class="rx-res ${l.cls}">${esc(l.t)}</div>`).join(''):''}
+    ${apply?`<button type="button" class="rx-go" data-rx="${r.i}" ${vk.busy||(vk.custom&&vk.custom.done.includes(r.i))?'disabled':''}>${vk.custom&&vk.custom.done.includes(r.i)?'Uygulandı':'Uygula'}</button>`:''}</li>`).join('')}</ul>`;
+}
+function chipsHTML(g){ return `<div class="hb-chips">${HASTA[g].map(([k,n])=>`<button type="button" class="hchip${k==='inst'?' warn':''}" data-hsel="${k}" aria-pressed="${hb.sel.has(k)}" ${k==='gebe'&&hb.cins==='Erkek'?'disabled':''}>${esc(n)}</button>`).join('')}</div>`; }
+function builderHTML(){
+  const opt=CATS.map(([k,nm])=>`<optgroup label="${esc(nm)}">${Object.entries(COND).filter(([,c])=>c.cat===k).map(([key,c])=>`<option value="${key}" ${key===hb.cond?'selected':''}>${esc(c.n)}</option>`).join('')}</optgroup>`).join('');
+  const bmi=hb.kilo&&hb.boy?(hb.kilo/Math.pow(hb.boy/100,2)).toFixed(1):'–';
+  return `<div class="hb"><div class="hb-form"><div><div class="eyebrow">Senaryo oluştur</div><h2>Hastanı oluştur</h2><p class="hb-sub">Özellikleri ve alerjileri gir, hastalığı seç. Tedaviler bu hastaya göre işaretlenir.</p></div>
+    <div class="hb-row"><label>Yaş<input type="number" min="16" max="105" data-hf="yas" value="${esc(hb.yas)}"></label>
+      <div class="hb-lab">Cinsiyet<div class="vlv">${['Kadın','Erkek'].map(s=>`<button type="button" data-hcins="${s}" aria-pressed="${hb.cins===s}">${s}</button>`).join('')}</div></div>
+      <label>Kilo (kg)<input type="number" min="30" max="250" data-hf="kilo" value="${esc(hb.kilo)}"></label>
+      <label>Boy (cm)<input type="number" min="120" max="220" data-hf="boy" value="${esc(hb.boy)}"></label><div class="hb-bmi">VKİ <b id="hbBmi">${bmi}</b></div></div>
+    <label class="hb-lab">Hastalık<select data-hf="cond">${opt}</select></label>
+    <div class="hb-g"><div class="eyebrow">Anlık durum</div>${chipsHTML('durum')}</div>
+    <div class="hb-g"><div class="eyebrow">Kronik hastalıklar</div>${chipsHTML('kronik')}</div>
+    <div class="hb-g"><div class="eyebrow">Kullandığı ilaçlar</div>${chipsHTML('ilac')}</div>
+    <div class="hb-g"><div class="eyebrow">Alerjiler</div>${chipsHTML('alerji')}<input class="search hb-ek" type="text" data-hf="ek" placeholder="Diğer alerji (serbest metin)" value="${esc(hb.ek)}" aria-label="Diğer alerji"></div>
+  </div>
+  <div class="hb-rx"><div class="hb-rxh"><div class="eyebrow">Tedavi seçenekleri</div><b id="hbCond">${esc(COND[hb.cond].n)}</b></div><div id="hbRx">${rxHTML(hb.cond,P0())}</div>
+    <div class="hb-go"><button class="bigbtn" type="button" data-hstart>Senaryoyu başlat<small>Kalp ve monitör bu hastayla</small></button>
+    <p class="disc">Doz ve kontrendikasyonlar erişkin için özet bilgidir; kurum protokolü ve güncel kılavuzla doğrulanmalıdır.</p></div></div></div>`;
+}
+function hbRefresh(){ if(!flip||flip.kind!=='new') return; $('hbRx').innerHTML=rxHTML(hb.cond,P0()); $('hbCond').textContent=COND[hb.cond].n; const b=$('hbBmi'); if(b) b.textContent=hb.kilo&&hb.boy?(hb.kilo/Math.pow(hb.boy/100,2)).toFixed(1):'–'; hbSave(); }
+document.addEventListener('click',e=>{
+  if(!flip||!e.target.closest('.flipov')) return;
+  if(e.target.classList.contains('flipov')||e.target.closest('[data-fclose]')){ closeFlip(); return; }
+  const fs=e.target.closest('[data-fstart]'); if(fs){ closeFlip(()=>startCase(fs.dataset.fstart)); return; }
+  if(e.target.closest('[data-hstart]')){ closeFlip(()=>startCustom()); return; }
+  const hc=e.target.closest('[data-hcins]'); if(hc){ hb.cins=hc.dataset.hcins; if(hb.cins==='Erkek') hb.sel.delete('gebe'); flip.front.querySelectorAll('[data-hcins]').forEach(b=>b.setAttribute('aria-pressed',b===hc)); const g=flip.front.querySelector('[data-hsel="gebe"]'); if(g){ g.disabled=hb.cins==='Erkek'; g.setAttribute('aria-pressed',hb.sel.has('gebe')); } hbRefresh(); return; }
+  const hs=e.target.closest('[data-hsel]'); if(hs){ const k=hs.dataset.hsel; hb.sel.has(k)?hb.sel.delete(k):hb.sel.add(k); hs.setAttribute('aria-pressed',hb.sel.has(k)); hbRefresh(); }
+});
+document.addEventListener('input',e=>{ const f=e.target.closest&&e.target.closest('.flipov [data-hf]'); if(!f) return; hb[f.dataset.hf]=f.type==='number'?(f.value===''?'':+f.value):f.value; hbRefresh(); });
+document.addEventListener('change',e=>{ const f=e.target.closest&&e.target.closest('.flipov select[data-hf]'); if(f){ hb.cond=f.value; hbRefresh(); } });
+
+/* Oluşturulan hastayla canlı senaryo */
+function customCase(){
+  const P=vk.custom.P, pick=g=>HASTA[g].filter(([k])=>P.sel.has(k)).map(([k,n])=>[n,k]);
+  const kr=pick('durum').concat(pick('kronik')), il=pick('ilac'), al=pick('alerji').concat(P.ek?[[P.ek]]:[]);
+  const c=COND[vk.custom.cond];
+  return {id:'ozel',cond:vk.custom.cond,brief:`${P.yas} yaş ${P.cins.toLocaleLowerCase('tr')} · ${c.n}`,
+    p:{yas:P.yas,cins:P.cins,kilo:P.kilo,boy:P.boy,kronik:kr.length?kr:[['Yok']],ilac:il.length?il:[['Düzenli ilaç yok']],alerji:al.length?al:[['Bilinen alerji yok']]},
+    sikayet:c.sum,vital:{Hemodinami:P.sel.has('inst')?'İnstabil':'Stabil',Ritim:c.n}};
+}
+function startCustom(){
+  vkStop(); vk.custom={P:Object.assign(P0(),{sel:new Set(hb.sel),ek:hb.ek}),cond:hb.cond,done:[],log:[]};
+  vk.id='ozel'; vk.cur=hb.cond; vk.dx=true; vk.fin=false; vk.si=0; vk.flags=new Set(); vk.steps=[]; vk.res=[];
+  if(history.replaceState) history.replaceState(null,'','#vaka');
+  selected=null; heart&&heart.select(null);
+  applyV3D(); render(); renderNav(); card.scrollTop=0;
+}
+function customHTML(){
+  const c=customCase(), cs=COND[vk.custom.cond];
+  return `${closeBtn}<div><div class="pills"><span class="pill">Kendi senaryon</span><span class="pill g">${esc(cs.n)}</span></div><h2 class="qq">${esc(c.brief.split(' · ')[0])}</h2></div>
+    ${patientHTML(c)}
+    <div class="vq"><b>Tedavi seçenekleri</b><span>Uygula’ya bas: uygun olanlar kalpte canlandırılır, kontrendike olanlarda nedenini görürsün.</span></div>
+    ${rxHTML(vk.custom.cond,vk.custom.P,true)}
+    <div class="actions"><button class="btn" type="button" data-hedit>Hastayı ya da hastalığı değiştir</button><button class="lnk" type="button" data-vmenu>Vaka destesine dön</button></div>
+    <div class="disc">Eğitim amaçlıdır, tıbbi tavsiye değildir.</div>`;
+}
+function rxApply(i){
+  if(vk.busy||!vk.custom) return;
+  const r=evalRx(vk.custom.cond,vk.custom.P)[i]; if(!r) return;
+  r.why.forEach(w=>{ if(w[2]&&(w[0]==='no'||w[0]==='warn')) vk.flags.add(w[2]); });
+  const L=vk.custom.log;
+  if(r.st==='no'){ L.push({i,n:r.n,t:'Kontrendike: '+(r.why.filter(w=>w[0]==='no').map(w=>w[1]).join(' ')||''),cls:'no'}); render(); return; }
+  vk.custom.done.push(i);
+  const fin=()=>{ L.push({i,n:r.n,t:(r.res||(r.next&&r.next!==vk.cur?'Ritim değişti: '+COND[r.next].n+'.':'Uygulandı.'))+(r.st==='warn'?' Yukarıdaki dikkat notları gözetilerek uygulandı.':''),cls:r.st==='warn'?'wa':'ok'}); };
+  if(r.anim&&heart&&heart.ready){
+    vk.busy=true; const cap=$('txcap'); cap.textContent=r.anim.t; cap.hidden=false; const fx=COND[vk.custom.cond].fx||{};
+    heart.treat(r.anim.k,{c:r.anim.c,vessel:fx.infarct==='rca'?'rca':'lad',onFlash:stageFlash,onFire:()=>{ if(r.next) switchCond(r.next); },onDone:()=>{ vk.busy=false; cap.hidden=true; fin(); render(); }});
+    render();
+  } else { if(r.next) switchCond(r.next); fin(); render(); }
+}
+
 /* ---------- Ana sayfa ---------- */
 function applyHome3D(){
   if(mode!=='ana') return;
@@ -731,7 +888,7 @@ function renderHome(){
     ['anatomi','Anatomi',`${Object.keys(S).length} yapı: odacıklar, koronerler, ileti sistemi, sinirler`,bar(sn('a'),Object.keys(S).length,`${sn('a')}/${Object.keys(S).length} incelendi`)],
     ['durumlar','Durumlar',`${Object.keys(COND).length} ritim ve klinik tablo, canlı EKG ile`,bar(sn('d'),Object.keys(COND).length,`${sn('d')}/${Object.keys(COND).length} çalışıldı`)],
     ['ogren','EKG dersleri',`${LESSONS.length} ders ve 12 derivasyonlu canlı EKG`,bar(sn('l'),LESSONS.length,`${sn('l')}/${LESSONS.length} tamamlandı`)],
-    ['vaka','Vakalar',`${CASES.length} hasta: tanı koy, tedaviyi seç`,bar(doneCases,CASES.length,`${doneCases}/${CASES.length} vaka bitti`)],
+    ['vaka','Vakalar',`${CASES.length} hasta ve kendi senaryon: tanı koy, tedaviyi seç`,bar(doneCases,CASES.length,`${doneCases}/${CASES.length} vaka bitti`)],
     ['sina','Sına','EKG’den tanı, kalpte bul, çoktan seçmeli',bar(tot[0],tot[1],tot[1]?`%${Math.round(100*tot[0]/tot[1])} doğru (${tot[1]} soru)`:'Henüz soru çözülmedi')]];
   let last='#anatomi'; try{ last=localStorage.getItem('kalp.last')||last; }catch(e){}
   const lastM=last.replace('#','').split('/')[0], lastN={anatomi:'Anatomi',durumlar:'Durumlar',ogren:'EKG dersleri',vaka:'Vakalar',sina:'Sına'}[lastM]||'Anatomi';
