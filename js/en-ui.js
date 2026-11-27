@@ -5,6 +5,8 @@
 const t=s=>window.KalpI18n?window.KalpI18n.t(s):s;
 const UI={
 'Mercek görseli':'Lens visual',
+'Ara':'Search','Ara (Ctrl+K)':'Search (Ctrl+K)','Ara (Ctrl+K ya da /)':'Search (Ctrl+K or /)','Sonuçlar':'Results',
+'Ara: yapı, hastalık, ilaç, etken, vaka…':'Search: structure, disease, drug, organism, case…',
 'Fizyoloji':'Physiology','Fizyopatoloji':'Pathophysiology','Farmakoloji':'Pharmacology','Mikrobiyoloji':'Microbiology','Histoloji':'Histology',
 'Fizyo\u00ADpatoloji':'Patho\u00ADphysiology','Farmako\u00ADloji':'Pharma\u00ADcology','Mikro\u00ADbiyoloji':'Micro\u00ADbiology',
 'Fizyo':'Physio','Pato':'Patho','Farma':'Pharm','Mikro':'Micro','Anatomi ve histoloji':'Anatomy and histology',

@@ -1015,11 +1015,11 @@ function vizShow(kind){ // kind: 'cv' | 'svg' | 'svg+ecg' | null
 const vzx=vzEcg.getContext('2d');
 function sizeMini(){ const r=vzEcg.getBoundingClientRect(), d=Math.min(2,window.devicePixelRatio||1); if(!r.width) return; vzEcg.width=Math.round(r.width*d); vzEcg.height=Math.round(r.height*d); vzx.setTransform(d,0,0,d,0,0); }
 function drawMini(){
-  const W=vzEcg.clientWidth, H=vzEcg.clientHeight; if(!W||!H) return; if(vzEcg.width<10) sizeMini();
+  const W=vzEcg.clientWidth, H=vzEcg.clientHeight; if(!W||!H) return; if(Math.abs(vzEcg.width-Math.round(W*Math.min(2,window.devicePixelRatio||1)))>2) sizeMini();
   const win=3.2, pps=W/win, ppmv=Math.min(H*0.34,pps*0.4), base=H*0.62, t0=sim.t-win;
   vzx.fillStyle=PAPER; vzx.fillRect(0,0,W,H); vzx.lineWidth=1;
   for(let k=Math.ceil(t0/0.2);k*0.2<=sim.t;k++){ const x=(k*0.2-t0)*pps; vzx.strokeStyle=GRID2; vzx.beginPath(); vzx.moveTo(x+.5,0); vzx.lineTo(x+.5,H); vzx.stroke(); }
-  vzx.strokeStyle=ECG; vzx.lineWidth=1.6; vzx.beginPath(); for(let i=0;i<=W;i+=1){ const v=sim.ecgAt(t0+i/pps); i?vzx.lineTo(i,base-v*ppmv):vzx.moveTo(i,base-v*ppmv); } vzx.stroke();
+  vzx.strokeStyle=ECG; vzx.lineWidth=1.6; vzx.lineJoin='round'; vzx.beginPath(); strokeCols(vzx,traceCols(t0,pps,Math.ceil(W)),t=>sim.ecgAt(t),v=>base-v*ppmv,0); vzx.stroke(); // ana EKG ile aynı sütun örnekleme: tepe noktaları kare kare titremez
 }
 function vizCtl(html){ $('vzCtl').innerHTML=html; }
 $('vzCtl').addEventListener('click',e=>{
@@ -1270,6 +1270,7 @@ function renderHome(){
   const started=sn('a')+sn('d')+sn('l')+nL('h',hs)+nL('f',fs)+nL('r',ds)+nL('m',ms)+tot[1]+doneCases>0;
   el.innerHTML=`<div class="hhero"><div class="eyebrow">${LG('Tıp öğrencileri için 3D kalp atlası','A 3D heart atlas for medical students')}</div><h1>${LG('Kalbi beş mercekte öğren','Learn the heart through five lenses')}</h1>
     <p>${LG('Ders kitabının sırasıyla: yapı, normal işleyiş, bozulma, ilaç ve etken. Her hastalık bir hasta vakasıyla biter.','In textbook order: structure, normal function, what goes wrong, drugs and organisms. Every disease ends with a patient case.')}</p>
+    <button class="hsearch" type="button" data-open-search><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg><span>${LG('Ne arıyorsun? Hastalık, ilaç, yapı…','Search a disease, drug, structure…')}</span><kbd>Ctrl K</kbd></button>
     <a class="lnk hpath" href="#yol/${yId}">${LG('Bir hastalığı baştan sona izle: 5 katman + vaka','Follow one disease end to end: 5 layers + a case')} →</a>
     <div class="streak">${FLAME}<span><b>${streak}</b> gün üst üste</span></div>
     <a class="bigbtn" href="${esc(started?last:'#anatomi')}">${started?`Kaldığın yerden devam et<small>${esc(lastN)}</small>`:'Anatomiden başla'}</a></div>
@@ -1395,6 +1396,72 @@ function loop(ts){
   heart&&heart.frame(lensLive||mode==='ana'||mode==='durumlar'||mode==='ogren'||mode==='vaka'||(mode==='sina'&&quiz.cur&&quiz.cur.t==='ecg'&&quiz.cur.done)?sim:null);
   drawLabels();
 }
+
+/* ---------- Arama: tüm içerikte (yapı, doku, konu, durum, ilaç, etken, yol, vaka, ders, SSS) ---------- */
+const srch=$('srch'), srIn=$('srIn'), srList=$('srList');
+const fold=x=>String(x||'').replace(/İ/g,'i').replace(/I/g,'ı').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/ı/g,'i');
+let SIDX=null, srSel=0, srHits=[];
+function srIndex(){
+  if(SIDX) return SIDX;
+  const out=[], add=(kind,col,h,t,alt,body)=>out.push({kind,col,h,t,alt:alt||'',ft:fold(t),fa:fold(alt),fb:fold(body)});
+  const J=a=>(a||[]).map(x=>Array.isArray(x)?x.join(' '):x).join(' ');
+  Object.keys(S).forEach(id=>add(LG('Anatomi','Anatomy'),LCOL.anatomi,'#anatomi/'+id,S[id].n,S[id].l,[S[id].d,S[id].f,S[id].c].join(' ')));
+  ORG.HISTO.forEach(x=>add(LG('Histoloji','Histology'),LCOL.anatomi,'#histoloji/'+x.id,x.n,x.boya+' · '+x.mag,x.d+' '+J(x.pts)+' '+x.klinik));
+  ORG.FIZYO.forEach(x=>add(LG('Fizyoloji','Physiology'),LCOL.fizyoloji,'#fizyoloji/'+x.id,x.n,'',x.d+' '+J(x.pts)+' '+x.klinik));
+  LESSONS.forEach(l=>add(LG('EKG dersi','ECG lesson'),LCOL.fizyoloji,'#ogren/'+l.id,l.t,'',String(l.body||'').replace(/<[^>]+>/g,' ')));
+  VISC().forEach(k=>{ const c=COND[k]; add(LG('Fizyopatoloji','Pathophysiology'),LCOL.fizyopatoloji,'#durumlar/'+k,c.n,c.tag,[c.sum,J(c.why),J(c.ecg),J(c.bul),J(c.lab),c.cli].join(' ')); });
+  ORG.FARMA.forEach(x=>add(LG('Farmakoloji','Pharmacology'),LCOL.farmakoloji,'#farmakoloji/'+x.id,x.n,x.ex,[x.hedef,x.mek,J(x.end),J(x.kontr),J(x.yan)].join(' ')));
+  ORG.MIKRO.forEach(x=>add(LG('Mikrobiyoloji','Microbiology'),LCOL.mikrobiyoloji,'#mikrobiyoloji/'+x.id,x.n,x.etken.map(e=>e[0]).join(' · '),x.d+' '+J(x.pat)+' '+J(x.tedavi)));
+  ORG.YOLLAR.forEach(y=>add(LG('Hastalık yolu','Disease pathway'),'var(--ink)','#yol/'+y.id,y.n,LG('5 katman + vaka','5 layers + a case'),''));
+  CASES.forEach(c=>add(LG('Vaka','Case'),'var(--ink)','#vaka/'+c.id,c.title,c.brief,c.sikayet||''));
+  (FAQ||[]).forEach(f=>add(LG('SSS','FAQ'),LCOL.fizyoloji,'#ogren/sss',f[1],f[0],f[2]));
+  return SIDX=out;
+}
+function srFind(q){
+  const fq=fold(q).trim(), tk=fq.split(/\s+/).filter(Boolean); if(!tk.length) return [];
+  const res=[];
+  for(const it of srIndex()){
+    let sc=0, ok=true;
+    for(const w of tk){ if(it.ft.includes(w)) sc+=it.ft.startsWith(w)||it.ft.includes(' '+w)?30:18; else if(it.fa.includes(w)) sc+=12; else if(it.fb.includes(w)) sc+=3; else { ok=false; break; } }
+    if(!ok) continue;
+    if(it.ft===fq) sc+=100; else if(it.ft.startsWith(fq)) sc+=50; else if(it.ft.includes(fq)) sc+=25;
+    res.push([sc,it]);
+  }
+  return res.sort((a,b)=>b[0]-a[0]||a[1].t.length-b[1].t.length).slice(0,40).map(r=>r[1]);
+}
+function srRender(){
+  const q=srIn.value;
+  if(!q.trim()){
+    const sug=[['Atriyal fibrilasyon','Atrial fibrillation'],['Beta blokör','Beta blocker'],['Endokardit','Endocarditis'],['Mitral kapak','Mitral valve'],['Frank–Starling','Frank–Starling'],['Digoksin','Digoxin'],['Hiperkalemi','Hyperkalaemia'],['Aschoff','Aschoff']];
+    srHits=[]; srList.innerHTML=`<div class="srsug"><span class="eyebrow">${LG('Örnek aramalar','Try searching')}</span><div>${sug.map(x=>`<button type="button" class="srchip" data-q="${esc(LG(x[0],x[1]))}">${esc(LG(x[0],x[1]))}</button>`).join('')}</div>
+      <span class="eyebrow">${LG('İlaç adı, etken, bulgu ya da yapı yazabilirsin','You can type a drug, organism, finding or structure')}</span></div>`; return;
+  }
+  srHits=srFind(q); srSel=Math.min(srSel,Math.max(0,srHits.length-1));
+  if(!srHits.length){ srList.innerHTML=`<p class="srnone">${LG('Sonuç yok. Başka bir kelime dene: ör. “QT”, “penisilin”, “LAD”.','No results. Try another word, e.g. “QT”, “penicillin”, “LAD”.')}</p>`; return; }
+  srList.innerHTML=srHits.map((it,i)=>{ const inBody=!fold(q).trim().split(/\s+/).every(w=>it.ft.includes(w)||it.fa.includes(w));
+    return `<a class="sritem${i===srSel?' on':''}" href="${it.h}" role="option" aria-selected="${i===srSel}" data-i="${i}"><i style="background:${it.col}"></i><span><b>${esc(it.t)}</b><small><span class="srk">${esc(it.kind)}${it.alt?' · ':''}</span>${esc(it.alt)}</small>${inBody?`<small class="srin">${LG('Metnin içinde geçiyor','Mentioned in the text')}</small>`:''}</span><em>${esc(it.kind)}</em></a>`; }).join('');
+  const on=srList.querySelector('.on'); if(on) on.scrollIntoView({block:'nearest'});
+}
+function openSearch(){ if(srch.open) return; srIn.value=''; srSel=0; srRender(); srch.showModal(); srIn.focus(); }
+function closeSearch(){ if(srch.open) srch.close(); }
+['btnSearch','btnSearch2','btnSearch3'].forEach(id=>{ const b=$(id); if(b) b.addEventListener('click',openSearch); });
+document.addEventListener('click',e=>{ if(e.target.closest('[data-open-search]')){ e.preventDefault(); openSearch(); } });
+srIn.addEventListener('input',()=>{ srSel=0; srRender(); });
+srIn.addEventListener('keydown',e=>{
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){ if(srHits.length){ srSel=(srSel+(e.key==='ArrowDown'?1:-1)+srHits.length)%srHits.length; srRender(); } e.preventDefault(); }
+  else if(e.key==='Enter'){ const it=srHits[srSel]; if(it){ e.preventDefault(); closeSearch(); if(location.hash===it.h) fromHash(); else location.hash=it.h; } }
+});
+srList.addEventListener('click',e=>{
+  const c=e.target.closest('[data-q]'); if(c){ srIn.value=c.dataset.q; srSel=0; srRender(); srIn.focus(); return; }
+  const a=e.target.closest('.sritem'); if(a){ closeSearch(); if(location.hash===a.getAttribute('href')){ e.preventDefault(); fromHash(); } }
+});
+srList.addEventListener('mousemove',e=>{ const a=e.target.closest('.sritem'); if(a&&+a.dataset.i!==srSel){ srSel=+a.dataset.i; srList.querySelectorAll('.sritem').forEach((x,i)=>{x.classList.toggle('on',i===srSel); x.setAttribute('aria-selected',i===srSel);}); } });
+srch.addEventListener('click',e=>{ if(e.target===srch) closeSearch(); });
+document.addEventListener('keydown',e=>{
+  const typing=/^(INPUT|TEXTAREA|SELECT)$/.test((e.target.tagName||''))||e.target.isContentEditable;
+  if((e.key==='k'||e.key==='K')&&(e.ctrlKey||e.metaKey)){ e.preventDefault(); srch.open?closeSearch():openSearch(); }
+  else if(e.key==='/'&&!typing&&!srch.open){ e.preventDefault(); openSearch(); }
+});
 window.__kalp={sim,get heart(){return heart;},get vk(){return vk;}};
 fromHash();
 requestAnimationFrame(loop);
