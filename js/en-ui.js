@@ -4,6 +4,10 @@
 'use strict';
 const t=s=>window.KalpI18n?window.KalpI18n.t(s):s;
 const UI={
+'Mercek görseli':'Lens visual',
+'Fizyoloji':'Physiology','Fizyopatoloji':'Pathophysiology','Farmakoloji':'Pharmacology','Mikrobiyoloji':'Microbiology','Histoloji':'Histology',
+'Fizyo\u00ADpatoloji':'Patho\u00ADphysiology','Farmako\u00ADloji':'Pharma\u00ADcology','Mikro\u00ADbiyoloji':'Micro\u00ADbiology',
+'Fizyo':'Physio','Pato':'Patho','Farma':'Pharm','Mikro':'Micro','Anatomi ve histoloji':'Anatomy and histology',
 /* index.html */
 'Kalp Simülatörü':'Heart Simulator',
 'Gerçek bir insan kalbi modelinde odacıkları, koroner dalları, venleri, ileti sistemini ve sinirleri tek tek incele; ritim bozukluklarını ve klinik durumları EKG ile izle.':'Explore the chambers, coronary branches, veins, conduction system and nerves of a real human heart model one by one; watch arrhythmias and clinical conditions on the ECG.',

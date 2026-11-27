@@ -2,7 +2,8 @@
    Türkçe içerik kaynak dildir. İngilizce seçiliyse:
      1) en-*.js dosyaları yüklenir; her biri KalpI18n.add({...}) ile çeviri paketi ekler.
      2) app.js açılırken KalpI18n.apply() paketleri window.KALP ve window.KalpECG12 üzerine birleştirir
-        (nesneler derin birleşir, diziler tümden değişir, {$replace:1} içeren nesne tümden değişir).
+        (nesneler derin birleşir, diziler tümden değişir, {$replace:1} içeren nesne tümden değişir;
+         'X+' listeye ekler, 'X~' liste öğelerini id ile eşleyip yalnız metinlerini birleştirir).
      3) Arayüz metinleri (index.html ve app.js'in ürettiği HTML) bir sözlükle çevrilir; DOM'a sonradan eklenen
         metinler MutationObserver ile yakalanır. Sözlük tam eşleşmedir, sayılı metinler için düzenli ifade kuralları vardır.
    Dil seçimi localStorage 'kalp.lang' içinde saklanır; ilk açılışta tarayıcı diline bakılır. */
@@ -17,6 +18,7 @@ const packs=[], dict=new Map(), rules=[];
 function merge(t,s){
   for(const k of Object.keys(s)){
     const v=s[k];
+    if(k.endsWith('~')&&Array.isArray(v)){ const a=t[k.slice(0,-1)]; if(Array.isArray(a)) for(const e of v){ const f=e.id!=null?'id':'k', x=a.find(o=>o&&o[f]===e[f]); if(x) merge(x,e); } continue; } // 'X~': öğeleri id (ya da k) ile eşleyip birleştir
     if(k.endsWith('+')&&Array.isArray(v)){ const b=k.slice(0,-1); t[b]=(Array.isArray(t[b])?t[b]:[]).concat(v); continue; } // 'X+': listeye ekle
     if(v&&typeof v==='object'&&!Array.isArray(v)&&typeof v!=='function'){
       if(v.$replace){ const c=Object.assign({},v); delete c.$replace; t[k]=c; continue; }
@@ -90,6 +92,6 @@ const I={
 };
 window.KalpI18n=I;
 /* İngilizce paketleri yalnız gerektiğinde yükle (betik bu noktaya, sırayla eklenir) */
-if(lang==='en') for(const f of ['en-content','en-scenarios','en-lessons','en-quiz','en-cases','en-cases2','en-patients','en-ui'])
+if(lang==='en') for(const f of ['en-content','en-scenarios','en-lessons','en-quiz','en-cases','en-cases2','en-patients','en-scenarios2','en-cases3','en-organ-kalp','en-ui'])
   document.write('<script src="js/'+f+'.js"><\/script>');
 })();

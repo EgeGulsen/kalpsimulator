@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kalp Simülatörü</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<meta name="description" content="Gerçek bir insan kalbi modelinde odacıkları, koroner dalları, venleri, ileti sistemini ve sinirleri tek tek incele; ritim bozukluklarını ve klinik durumları EKG ile izle.">
+<meta name="description" content="Tıp öğrencileri için kalp: anatomi ve histoloji, fizyoloji, fizyopatoloji, farmakoloji ve mikrobiyoloji beş mercekte; 3D model, canlı EKG ve hasta vakaları.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap">
@@ -24,16 +24,20 @@
   <div class="tip" id="tip" hidden></div>
   <div class="flash" id="flash" aria-hidden="true"></div>
   <div class="txcap" id="txcap" hidden></div>
+  <div class="scope" id="scope" hidden aria-live="polite"></div>
 </div>
 
 <header class="top">
   <a class="brand" href="#ana" id="brand" aria-label="Kalp Simülatörü ana sayfa" title="Ana sayfa"><i aria-hidden="true"><svg viewBox="0 0 24 24" fill="#fff"><path d="M12 21s-7.5-4.6-9.6-9.3C.9 8.3 3.1 4.5 6.8 4.5c2.1 0 3.6 1.1 4.4 2.6.8-1.5 2.3-2.6 4.4-2.6 3.7 0 5.9 3.8 4.4 7.2C19.5 16.4 12 21 12 21z"/></svg></i><span>Kalp Simülatörü</span></a>
   <nav class="tabs" aria-label="Bölüm">
-    <a href="#anatomi" id="tab-anatomi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-6.5-4-8.3-8.1C2.4 9 4.3 5.7 7.5 5.7c1.8 0 3.1 1 3.8 2.3.7-1.3 2-2.3 3.8-2.3 3.2 0 5.1 3.3 3.8 6.2C17 16 12 20 12 20z"/></svg><span>Anatomi</span></a>
-    <a href="#durumlar" id="tab-durumlar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12h4l2-5 4 10 3-7 2 2h5"/></svg><span>Durumlar</span></a>
-    <a href="#ogren" id="tab-ogren"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h11a3 3 0 0 1 3 3v11H7a3 3 0 0 1-3-3z"/><path d="M8 9h6M8 13h4"/></svg><span>EKG dersleri</span></a>
-    <a href="#vaka" id="tab-vaka"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M9 3v4M15 3v4M8 12.5h8M12 8.5v8"/></svg><span>Vakalar</span></a>
-    <a href="#sina" id="tab-sina"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 12.5l2.3 2.3 4.7-5"/></svg><span>Sına</span></a>
+    <a href="#anatomi" id="tab-anatomi" title="Anatomi ve histoloji"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-6.5-4-8.3-8.1C2.4 9 4.3 5.7 7.5 5.7c1.8 0 3.1 1 3.8 2.3.7-1.3 2-2.3 3.8-2.3 3.2 0 5.1 3.3 3.8 6.2C17 16 12 20 12 20z"/></svg><span class="tl">Anatomi</span><span class="ts">Anatomi</span></a>
+    <a href="#fizyoloji" id="tab-fizyoloji" title="Fizyoloji"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12c1.5-5 3-5 4.5 0s3 5 4.5 0 3-5 4.5 0 3 5 4.5 0"/></svg><span class="tl">Fizyoloji</span><span class="ts">Fizyo</span></a>
+    <a href="#durumlar" id="tab-durumlar" title="Fizyopatoloji"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12h4l2-5 4 10 3-7 2 2h5"/></svg><span class="tl">Fizyo&shy;patoloji</span><span class="ts">Pato</span></a>
+    <a href="#farmakoloji" id="tab-farmakoloji" title="Farmakoloji"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="8.5" width="17" height="7" rx="3.5" transform="rotate(-35 12 12)"/><path d="M9.6 8.6l4.8 6.8"/></svg><span class="tl">Farmako&shy;loji</span><span class="ts">Farma</span></a>
+    <a href="#mikrobiyoloji" id="tab-mikrobiyoloji" title="Mikrobiyoloji"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/><circle cx="10.5" cy="11" r="1"/></svg><span class="tl">Mikro&shy;biyoloji</span><span class="ts">Mikro</span></a>
+    <i class="tabsep" aria-hidden="true"></i>
+    <a href="#vaka" id="tab-vaka"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M9 3v4M15 3v4M8 12.5h8M12 8.5v8"/></svg><span class="tl">Vakalar</span><span class="ts">Vaka</span></a>
+    <a href="#sina" id="tab-sina"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 12.5l2.3 2.3 4.7-5"/></svg><span class="tl">Sına</span><span class="ts">Sına</span></a>
   </nav>
   <button class="iconbtn langbtn" id="btnLang" type="button" aria-label="Dil seç" aria-haspopup="menu" aria-expanded="false" aria-controls="langMenu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.6 3.8 5.6 3.8 9s-1.2 6.4-3.8 9M12 3C9.4 5.6 8.2 8.6 8.2 12s1.2 6.4 3.8 9"/></svg><span class="langcode">TR</span></button>
   <button class="iconbtn themebtn" id="btnTheme" type="button" aria-label="Açık ya da koyu temaya geç"><svg class="ic-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg><svg class="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4"/></svg><span>Tema</span></button>
@@ -69,6 +73,11 @@
     </div>
   </div>
   <canvas id="ecg12c" aria-label="12 derivasyonlu EKG. Bir derivasyonu seçmek için tıkla."></canvas>
+</section>
+
+<section class="viz" id="viz" aria-label="Mercek görseli">
+  <div class="vzh"><div class="vzt"><span class="eyebrow" id="vzEye"></span><b id="vzTitle"></b></div><div class="vzc" id="vzCtl"></div></div>
+  <div class="vzb"><canvas id="vzCv" aria-hidden="true"></canvas><div class="vzsvg" id="vzSvg"></div><div class="vzecg" id="vzEcgBox"><span class="vzel" id="vzEcgLbl"></span><span class="vzhr" id="vzEcgHr"></span><canvas id="vzEcg" aria-label="Kayan örnek EKG"></canvas></div></div>
 </section>
 
 <aside class="panel nav" id="nav" aria-label="Liste"></aside>
@@ -114,6 +123,10 @@
 <script src="js/cases.js"></script>
 <script src="js/cases2.js"></script>
 <script src="js/patients.js"></script>
+<script src="js/scenarios2.js"></script>
+<script src="js/cases3.js"></script>
+<script src="js/organ-kalp.js"></script>
+<script src="js/viz.js"></script>
 <script src="js/ecg12.js"></script>
 <script src="js/i18n.js"></script>
 <script src="js/sim.js"></script>

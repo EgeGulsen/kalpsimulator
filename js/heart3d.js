@@ -488,6 +488,13 @@ function create(el,opts){
       [lo,hi].forEach(e=>{ if(!e) return; let c=V(0,0,0),k=0; for(let i=0;i<a.length;i+=3){const p=V(a[i],a[i+1],a[i+2]); if(p.distanceTo(e)<0.32){c.add(p);k++;}} c.multiplyScalar(1/k); const s=new T.Mesh(new T.SphereGeometry(0.1,20,14),new T.MeshStandardMaterial({color:0x5a0d14,roughness:0.85,depthTest:false})); s.position.copy(c.lerp(e,-0.05)); s.renderOrder=6; s.visible=false; SG.add(s); FX.clots.push(s);});
     }
 
+    // Enfektif endokardit / romatizmal kapak: kapak üzerinde vejetasyon ya da kalınlaşma kümesi
+    FX.veg={};
+    [['mit',mitC],['aov',geos.aov?centroid('aov'):null],['tri',triC]].forEach(([k,c0])=>{ if(!c0) return; const g=new T.Group(); g.position.copy(c0);
+      const mat=new T.MeshStandardMaterial({color:0xd9c27a,roughness:0.95,emissive:0x5a3a00,emissiveIntensity:0.35,depthTest:false});
+      [[0,0,0,0.07],[0.06,0.03,0.02,0.05],[-0.05,0.04,-0.02,0.045],[0.02,-0.05,0.04,0.04],[-0.03,-0.03,-0.05,0.035]].forEach(([x,y,z,r])=>{ const m=new T.Mesh(new T.IcosahedronGeometry(r,1),mat); m.position.set(x,y,z); m.renderOrder=7; g.add(m); });
+      g.visible=false; SG.add(g); FX.veg[k]=g; });
+
     // Kasılma için pivotlar
     const atrPivot=raC.clone().lerp(laC,0.5);
     [['sa',SA,CG],['avn',AVN,CG],['int',raMid,CG],['bach',laC.clone().lerp(laTip,0.6).addScaledVector(V(0,1,0),0.25),CG],['his',AVN.clone().lerp(HE,0.6),CV],['rbb',rbbPts[Math.min(2,rbbPts.length-1)],CV],['lbb',HE.clone().lerp(LBE,0.6),CV],['laf',LAFe,CV],['lpf',LPFe,CV],['purk',endo(lvAx(0.9),nu,LVW)||lvAx(0.9),CV]]
@@ -522,6 +529,10 @@ function create(el,opts){
     for(const k in F.occl) F.occl[k].g.visible=fx.infarct===k;
     F.sacFluid.visible=F.sacOuter.visible=fx.sac==='fluid'; F.sacInfl.visible=fx.sac==='inflamed';
     F.clots.forEach(c=>c.visible=!!fx.clot);
+    for(const k in F.veg) F.veg[k].visible=fx.veg===k;
+    // Dilate kardiyomiyopati / HFrEF: sol ventrikül genişlemesi
+    const lvm=R.meshes.lv;
+    if(lvm){ if(fx.lvDilate){const s=1.06, c=R.L.ivsC; lvm.scale.setScalar(s); lvm.position.copy(c).multiplyScalar(1-s);} else {lvm.scale.setScalar(1); lvm.position.set(0,0,0);} }
     // PE: sağ ventrikül genişlemesi (septumdan dışa doğru)
     const rv=R.meshes.rv;
     if(fx.rvDilate){const s=1.07, c=R.L.ivsC; rv.scale.setScalar(s); rv.position.copy(c).multiplyScalar(1-s);} else {rv.scale.setScalar(1); rv.position.set(0,0,0);}

@@ -25,7 +25,13 @@ const MORPH={
   peIII:{q:[[.016,.009,-.32],[.045,.011,.6],[.07,.01,-.15]],J:.08,T:[-.09,.045,-.25]},
   peri:{q:[[.012,.008,-.05],[.04,.0105,1.0],[.066,.01,-.18]],J:.08,st:.14,T:[-.09,.05,.35]},
   hyperk:{q:[[.014,.011,-.07],[.05,.015,1.0],[.086,.014,-.28]],J:.1,T:[-.13,.022,.95],qt:-.03},
-  hypok:{q:[[.012,.008,-.07],[.04,.0105,1.1],[.066,.01,-.22]],J:.08,st:-.07,T:[-.1,.05,.07],U:[.07,.04,.2],qt:.04}
+  hypok:{q:[[.012,.008,-.07],[.04,.0105,1.1],[.066,.01,-.22]],J:.08,st:-.07,T:[-.1,.05,.07],U:[.07,.04,.2],qt:.04},
+  /* Yapısal hastalıklar ve ilaç etkileri (DII / V5 benzeri) */
+  lvh:{q:[[.012,.008,-.06],[.042,.012,2.1],[.07,.011,-.3]],J:.09,st:-.1,T:[-.07,.055,-.35]},
+  hcm:{q:[[.014,.009,-.42],[.044,.012,1.9],[.072,.011,-.25]],J:.09,st:-.06,T:[-.07,.05,-.3]},
+  myo:{q:[[.012,.008,-.05],[.04,.0105,.85],[.066,.01,-.16]],J:.08,st:.2,T:[-.08,.055,.4]},
+  dig:{q:[[.012,.008,-.07],[.04,.0105,1.1],[.066,.01,-.2]],J:.08,st:-.14,T:[-.06,.05,.08],qt:-.04},
+  qtlong:{q:[[.012,.008,-.07],[.04,.0105,1.1],[.066,.01,-.22]],J:.08,T:[-.06,.06,.26],qt:.13}
 };
 
 function createSim(COND){
@@ -69,7 +75,7 @@ function createSim(COND){
     const V=r.vent;
     while(V&&V!=='vf'&&V!=='none'&&sim.nextV<until){
       const tv=sim.nextV; let rr;
-      if(V==='af'){rr=0.34+sim.rng()*0.48; pushV({t:tv,rr,src:'af',act:'normal',morph:r.morph,hp:true,avn:[tv-.1,.06]});}
+      if(V==='af'){rr=(0.34+sim.rng()*0.48)*(r.afSlow||1); pushV({t:tv,rr,src:'af',act:'normal',morph:r.morph,hp:true,avn:[tv-.1,.06]});}
       else if(V==='escape'){rr=60/r.ventRate; pushV({t:tv,rr,src:'escape',act:'normal',morph:'narrow',hp:true});}
       else if(V==='vt'){rr=60/r.ventRate; pushV({t:tv,rr,src:'vt',act:'vt',morph:'vt',hp:false});}
       else if(V==='torsades'){rr=60/r.ventRate*(1+0.1*Math.sin(tv*5)); pushV({t:tv,rr,src:'tdp',act:'tdp',morph:'vt',hp:false});}
