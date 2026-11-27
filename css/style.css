@@ -629,7 +629,7 @@ html[data-lang="en"]:not(.i18n-ok) body{visibility:hidden}
 .sysbar{display:none}
 body[data-mode="anatomi"] .sysbar{position:absolute;z-index:4;top:12px;left:12px;right:70px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px}
 .sysbar::-webkit-scrollbar{display:none}
-.sysbar button{display:inline-flex;align-items:center;gap:7px;flex:none;min-height:36px;padding:6px 13px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);color:var(--mute);font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px -8px #1b233366;transition:background .15s,color .15s,border-color .15s}
+.sysbar button{display:inline-flex;align-items:center;gap:7px;flex:none;min-height:36px;padding:6px 11px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);color:var(--mute);font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px -8px #1b233366;transition:background .15s,color .15s,border-color .15s}
 .sysbar button:hover{color:var(--ink);border-color:var(--line-2)}
 .sysbar button i{width:10px;height:10px;border-radius:50%;flex:none}
 .sysbar button[aria-pressed="true"]{background:var(--inv-bg);border-color:var(--inv-bg);color:var(--inv-fg)}
@@ -642,3 +642,146 @@ body[data-mode="anatomi"] .layer-tog{display:none}
 .card .hint2{font-size:13.5px;color:var(--mute)}
 @media (max-width:980px){ body[data-mode="anatomi"] .sysbar{top:10px;left:10px;right:58px} .sysbar button{min-height:34px;padding:5px 11px;font-size:12.5px} }
 @media (max-width:980px){ body[data-mode="anatomi"] .sysbar{-webkit-mask-image:linear-gradient(90deg,#000 85%,transparent);mask-image:linear-gradient(90deg,#000 85%,transparent);padding-right:28px} }
+
+/* =====================================================================
+   AŞAMA 1: Beş mercek (Anatomi+Histoloji · Fizyoloji · Fizyopatoloji · Farmakoloji · Mikrobiyoloji)
+   ===================================================================== */
+:root{--rail:100px;--vizh:300px}
+@media (min-width:981px){ .tabs a,.iconbtn{width:84px;font-size:10.5px;hyphens:manual;overflow-wrap:break-word} }
+.tabs a .ts{display:none}
+.tabs a .tl{max-width:80px;line-height:1.15}
+.tabsep{display:block;width:40px;height:1.5px;background:var(--line);margin:4px auto;border-radius:2px}
+@media (min-width:981px) and (max-width:1280px){ :root{--rail:92px} .tabs a,.iconbtn{width:80px;font-size:10px} }
+@media (min-width:981px) and (max-height:900px){ .tabs{gap:2px} .tabs a,.iconbtn{padding:6px 0 5px;gap:2px} .tabs a svg,.iconbtn svg{width:21px;height:21px} .brand{margin-bottom:6px} .brand i{width:40px;height:40px} }
+@media (min-width:981px) and (max-height:720px){ .tabs a .tl{display:none} .tabs a .ts{display:block} .iconbtn span{display:none} }
+@media (max-width:980px){
+  .tabs{max-width:640px}
+  .tabs a .tl{display:none} .tabs a .ts{display:block}
+  .tabs a{font-size:10px;padding:6px 0 5px}
+  .tabsep{width:1.5px;height:30px;margin:auto 2px;flex:none}
+}
+
+/* Histoloji sistem düğmesi ve sistem çubuğu */
+body[data-mode="histoloji"] .sysbar{position:absolute;z-index:6;top:12px;left:12px;right:70px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px}
+.sysbar .hsys i{background:conic-gradient(#ef9fbb 0 50%,#5a3b8f 0)}
+@media (max-width:980px){ body[data-mode="histoloji"] .sysbar{top:10px;left:10px;right:58px} }
+
+/* Mikroskop: 3D’den yakınlaşan dairesel görüş alanı */
+.scope{position:absolute;inset:0;z-index:5;display:grid;place-items:center;padding:58px 16px 16px;background:color-mix(in srgb,var(--stage-2) 70%,transparent);-webkit-backdrop-filter:blur(5px);backdrop-filter:blur(5px);opacity:0;transition:opacity .35s ease;pointer-events:none}
+.scope.in{opacity:1;pointer-events:auto}
+.scope .scw{position:relative;width:min(100%,calc((100% - 0px)));max-width:980px;transform:scale(.18);transform-origin:31% 50%;transition:transform .7s cubic-bezier(.2,.9,.25,1)}
+.scope.in .scw{transform:none}
+.scope svg{display:block;width:100%;height:auto;max-height:calc(100vh - var(--stage-b) - 120px);filter:drop-shadow(0 20px 40px #0006)}
+.scbar{position:absolute;left:2%;top:-6px;display:flex;gap:8px;align-items:center;z-index:2;font-size:12px;font-weight:800;color:#fff}
+.scbar b{background:#111a;border-radius:999px;padding:3px 10px;font-family:var(--mono)}
+.scbar span{background:#111a;border-radius:999px;padding:3px 10px}
+.scbar .x2{width:28px;height:28px;border-radius:50%;border:0;background:#fff;color:#1b2333;font-size:18px;cursor:pointer;line-height:1}
+.vz-histo .hl text{paint-order:stroke}
+@media (prefers-reduced-motion: reduce){ .scope,.scope .scw{transition:none} }
+
+/* Mercek görsel paneli (kalbin altında) */
+body:has(#viz.show){--stage-b:calc(var(--vizh) + 2*var(--g))}
+.viz{position:fixed;z-index:3;left:var(--stage-l);right:var(--stage-r);bottom:var(--g);height:var(--vizh);display:grid;grid-template-rows:auto minmax(0,1fr);
+  background:var(--card);border:1px solid var(--line);border-radius:24px;overflow:hidden;transform:translateY(14px);opacity:0;pointer-events:none;transition:transform .4s cubic-bezier(.2,.9,.25,1),opacity .3s,right .3s ease}
+.viz.show{transform:none;opacity:1;pointer-events:auto}
+.vzh{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;justify-content:space-between;padding:9px 14px;border-bottom:1px solid var(--line)}
+.vzt{display:flex;gap:10px;align-items:baseline;min-width:0;font-size:14px}
+.vzt b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vzc{display:flex;flex-wrap:wrap;gap:4px}
+.vzb{position:relative;min-height:0;display:grid;grid-template-columns:minmax(0,1fr)}
+.viz[data-kind="svg+ecg"] .vzb{grid-template-columns:minmax(0,1fr) minmax(200px,32%)}
+#vzCv{position:absolute;inset:0;display:block;width:100%;height:100%}
+.vzsvg{min-width:0;min-height:0;display:grid;place-items:center;padding:6px 10px}
+.vzsvg svg{width:100%;height:100%;max-height:100%}
+.vzecg{position:relative;border-left:1px solid var(--line);min-width:0}
+.vzecg canvas{position:absolute;inset:0;display:block;width:100%;height:100%}
+.vzel{z-index:1;position:absolute;left:10px;top:8px;right:60px;font-size:11.5px;font-weight:800;color:var(--ink);background:var(--glass);border-radius:6px;padding:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vzhr{z-index:1;position:absolute;right:10px;top:8px;font-family:var(--mono);font-size:12px;font-weight:600;color:var(--ecg-ink)}
+@media (max-width:980px){
+  .viz{position:relative;order:2;left:auto;right:auto;bottom:auto;height:auto;max-height:0;border-width:0;border-radius:20px;transform:translateY(-8px);transition:max-height .5s,opacity .3s,transform .4s}
+  .viz.show{max-height:560px;border-width:1px}
+  .vzb{height:250px}
+  .viz[data-kind="svg+ecg"] .vzb{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) 92px;height:330px}
+  .vzecg{border-left:0;border-top:1px solid var(--line)}
+}
+
+/* Kartlardaki ortak mercek parçaları */
+.lchips{display:flex;flex-wrap:wrap;gap:6px}
+.lchip{display:inline-flex;align-items:center;gap:7px;padding:5px 11px 5px 9px;border-radius:999px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink-2);font-size:12.5px;font-weight:700;text-decoration:none;line-height:1.3}
+.lchip:hover{border-color:var(--teal);color:var(--ink)}
+.lchip i{width:9px;height:9px;border-radius:50%;flex:none}
+.lchip small{font-size:10.5px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+.lstrip{border:1.5px solid var(--line);border-radius:18px;padding:12px;background:var(--card-2)}
+.lsh{display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin-bottom:10px}
+.lsh a{font-size:12.5px;font-weight:800;color:var(--teal-ink);text-decoration:none;text-align:right}
+.lstrip ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px}
+.lstrip li{min-width:0}
+.lstrip li a{min-width:0;overflow-wrap:anywhere;display:grid;justify-items:center;gap:4px;text-decoration:none;color:var(--mute);font-size:10px;font-weight:700;text-align:center;line-height:1.15;padding:4px 0;border-radius:10px}
+.lstrip li a:hover{background:var(--surface);color:var(--ink)}
+.lstrip li b{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:12.5px;color:var(--c,var(--ink));border:2px solid var(--c,var(--ink));background:var(--surface)}
+.lstrip li.on b{background:var(--c);color:#fff}
+.lstrip li.on a{color:var(--ink)}
+.lstrip li.none{opacity:.45}
+.lstrip li.vk b{--c:var(--ink);background:var(--inv-bg);color:var(--inv-fg);border-color:var(--inv-bg);font-size:10px}
+.lsmore{margin-top:8px;font-size:12px;color:var(--mute);display:flex;flex-wrap:wrap;gap:4px 10px}
+.lnk2{color:var(--teal-ink);font-weight:700;text-decoration:none}
+.seg2{display:flex;flex-wrap:wrap;gap:6px}
+.seg2 button{border:1.5px solid var(--line);background:var(--surface);color:var(--ink-2);border-radius:12px;padding:6px 12px;font-size:13px;font-weight:700;cursor:pointer}
+.seg2 button[aria-pressed="true"]{background:var(--teal);border-color:var(--teal);color:#fff}
+.actions.row{display:flex;flex-wrap:wrap;gap:8px}
+dl.read.one{grid-template-columns:minmax(0,1fr)}
+.dsteps{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.dsteps button{display:grid;grid-template-columns:28px 1fr;gap:10px;align-items:start;width:100%;text-align:left;background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:9px 12px;font-size:13.5px;color:var(--ink-2);cursor:pointer;line-height:1.45}
+.dsteps b{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--card-2);color:var(--mute);font-size:12px}
+.dsteps li.done b{background:var(--teal-soft);color:var(--teal-ink)}
+.dsteps li.on button{border-color:var(--teal);background:var(--teal-soft);color:var(--ink)}
+.dsteps li.on b{background:var(--teal);color:#fff}
+.dsteps+.qnext,.dsteps~.qnext{margin-top:8px}
+.etk{display:grid;gap:6px}
+.etk>div{display:grid;gap:2px;padding:9px 12px;border-radius:14px;background:var(--card-2);border:1px solid var(--line)}
+.etk b{font-size:13.5px;font-style:italic}
+.etk small{font-size:11.5px;font-weight:700;color:var(--violet)}
+.etk span{font-size:13px;color:var(--ink-2)}
+.calc{border:1.5px solid var(--line);border-radius:18px;padding:12px 14px;display:grid;gap:6px;background:var(--surface)}
+.calc .ch{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);margin-top:6px}
+.ck{display:grid;grid-template-columns:20px 1fr;gap:8px;align-items:start;font-size:13px;color:var(--ink-2);cursor:pointer;line-height:1.4}
+.ck input{width:18px;height:18px;margin:1px 0 0;accent-color:var(--teal)}
+.ck.gas{padding:8px 10px;border-radius:12px;background:var(--amber-soft);color:var(--amber-ink);font-weight:600}
+.cres{margin-top:6px;padding:10px 12px;border-radius:12px;font-weight:800;font-size:14px;text-align:center}
+.cres.def{background:var(--ok-soft);color:var(--ok)}
+.cres.pos{background:var(--amber-soft);color:var(--amber-ink)}
+.cres.rej{background:var(--card-2);color:var(--mute)}
+.rxw{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.rxw li{font-size:13px;color:var(--ink-2);padding:8px 10px;border-radius:12px;background:var(--card-2);line-height:1.4}
+.rxw .pill2{display:inline-block;font-size:10.5px;font-weight:800;border-radius:999px;padding:0 8px;margin-right:6px}
+.rxw li.no .pill2{background:var(--no-soft);color:var(--no)} .rxw li.warn .pill2{background:var(--amber-soft);color:var(--amber-ink)} .rxw li.info .pill2{background:var(--teal-soft);color:var(--teal-ink)}
+.rxw b{margin-right:4px}
+.stepn{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--violet-soft);color:var(--violet);font-size:11.5px;margin-right:8px;vertical-align:1px}
+.item.ylink{background:var(--violet-soft);color:var(--violet);font-weight:700;margin-bottom:8px}
+a.item{text-decoration:none}
+.ypath{list-style:none;margin:0;padding:0;display:grid;gap:0}
+.ypath li{position:relative;padding:0 0 14px 40px}
+.ypath li::before{content:"";position:absolute;left:14px;top:28px;bottom:0;width:2px;background:var(--line)}
+.ypath li:last-child::before{display:none}
+.yph{display:flex;gap:10px;align-items:center;margin-left:-40px;margin-bottom:4px}
+.yph b{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--c);color:#fff;font-size:13px;flex:none}
+.yph span{font-weight:800;font-size:14px;color:var(--ink)}
+.ypath p{margin:0 0 8px;font-size:13.5px;color:var(--ink-2)}
+.ypath .bigbtn{text-decoration:none}
+.hhero .hpath{justify-self:start;font-weight:800;color:var(--teal-ink);text-decoration:none;font-size:14px}
+
+/* Ana sayfa: 7 kart (5 mercek + vaka + sına) */
+:root{--homeh:204px}
+.htiles{grid-template-columns:repeat(7,minmax(0,1fr));gap:10px}
+.htile{position:relative;padding:14px 13px 12px}
+.htile b{font-size:14.5px;line-height:1.2}
+.htile span{font-size:11.8px}
+.htile .hn{position:absolute;top:12px;right:12px;font-style:normal;font-size:11px;font-weight:800;color:var(--faint);border:1.5px solid var(--line);border-radius:50%;width:22px;height:22px;display:grid;place-items:center}
+.htile.alt{background:var(--card-2)}
+.htile:nth-child(5) i{background:var(--amber-soft);color:#c7792f}
+.htile:nth-child(6) i{background:var(--card-2);color:var(--ink)}
+.htile:nth-child(7) i{background:var(--ok-soft);color:var(--ok)}
+@media (min-width:981px) and (max-width:1400px){ .htile span{display:none} :root{--homeh:150px} }
+@media (max-width:980px){ .htiles{grid-template-columns:repeat(2,minmax(0,1fr))} .htile span{display:block} }
+.card>*{min-width:0}
+.card details:not([open])>:not(summary){display:none}

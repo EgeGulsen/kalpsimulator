@@ -28,7 +28,7 @@ try{
       const r=stage.getBoundingClientRect();
       tip.textContent=S[id]?S[id].n:id; tip.hidden=false; tip.style.left=(x-r.left)+'px'; tip.style.top=(y-r.top)+'px';
     },
-    onReady:()=>{loading.hidden=true; heart.setFocus(effFocus()); if(partsOpen) renderParts(); heart.setTorso(torsoWanted()); if(mode==='ana'){applyHome3D();} else if(mode==='ogren'){applyLearn3D();} else if(mode==='sina'){applyQ3D();} else if(mode==='vaka'){applyV3D();} else heart.setMode(mode,mode==='durumlar'?COND[condKey]:null,condKey); heart.setXray(xray.checked); if(mode==='anatomi') applySys3D(); heart.select(selected); insets(); if(mode==='durumlar'&&(COND[condKey].fx||{}).infarct==='rca'){heart.viewFrom('inferior'); lastView=true;}},
+    onReady:()=>{loading.hidden=true; heart.setFocus(effFocus()); if(partsOpen) renderParts(); heart.setTorso(torsoWanted()); if(mode==='ana'){applyHome3D();} else if(isLens(mode)){ enterLens(mode); } else if(mode==='ogren'){applyLearn3D();} else if(mode==='sina'){applyQ3D();} else if(mode==='vaka'){applyV3D();} else heart.setMode(mode,mode==='durumlar'?COND[condKey]:null,condKey); if(!isLens(mode)) heart.setXray(xray.checked); if(mode==='anatomi') applySys3D(); heart.select(selected); insets(); if(mode==='durumlar'&&(COND[condKey].fx||{}).infarct==='rca'){heart.viewFrom('inferior'); lastView=true;}},
     onError:()=>{loading.innerHTML='3D model yüklenemedi. Dosyayı doğrudan açtıysan bir yerel sunucu ile aç<br>(ör. <code>python3 -m http.server</code>).';}
   });
   stage.insertBefore(heart.canvas,stage.firstChild);
@@ -44,7 +44,7 @@ function insets(){
 window.addEventListener('resize',()=>{insets(); sizeCanvas();});
 
 /* ---------- İlerleme: görülen konular ve günlük seri (yalnız bu tarayıcıda) ---------- */
-const seen={a:[],d:[],l:[]};
+const seen={a:[],d:[],l:[],h:[],f:[],r:[],m:[],y:[]};
 try{ const sv=JSON.parse(localStorage.getItem('kalp.seen')||'null'); if(sv) for(const k in seen) if(Array.isArray(sv[k])) seen[k]=sv[k]; }catch(e){}
 function markSeen(k,id){ if(!id||seen[k].includes(id)) return; seen[k].push(id); try{ localStorage.setItem('kalp.seen',JSON.stringify(seen)); }catch(e){} }
 const isSeen=(k,id)=>seen[k].includes(id);
@@ -81,7 +81,9 @@ let asys='oda'; try{ const v=localStorage.getItem('kalp.asys'); if(SYSK[v]) asys
 const sysIds=k=>GROUPS.flatMap(g=>g[1]).filter(id=>S[id]&&sysOf(id)===k);
 const sysbar=$('sysbar');
 function renderSysbar(){
-  sysbar.innerHTML=SYS.map(x=>`<button type="button" data-sys="${x.k}" aria-pressed="${x.k===asys}" title="${esc(x.n)}"><i style="background:${x.c}"></i><span class="sl">${esc(x.n)}</span><span class="ss">${esc(x.s)}</span></button>`).join('');
+  const hist=mode==='histoloji';
+  sysbar.innerHTML=SYS.map(x=>`<button type="button" data-sys="${x.k}" aria-pressed="${!hist&&x.k===asys}" title="${esc(x.n)}"><i style="background:${x.c}"></i><span class="sl">${esc(x.n)}</span><span class="ss">${esc(x.s)}</span></button>`).join('')+
+    `<button type="button" class="hsys" data-sys="histo" aria-pressed="${hist}" title="${LG('Histoloji: doku ve hücre','Histology: tissue and cell')}"><i></i><span class="sl">${LG('Histoloji','Histology')}</span><span class="ss">${LG('Histoloji','Histology')}</span></button>`;
 }
 function applySys3D(){
   if(!heart||!heart.ready||mode!=='anatomi') return;
@@ -103,7 +105,7 @@ function setSys(k,keep){
   if(!keep&&selected&&sysOf(selected)!==k){ selected=null; heart&&heart.select(null); }
   renderSysbar(); applySys3D(); if(mode==='anatomi'){ render(); renderNav(); }
 }
-sysbar.addEventListener('click',e=>{ const b=e.target.closest('[data-sys]'); if(b) setSys(b.dataset.sys); });
+sysbar.addEventListener('click',e=>{ const b=e.target.closest('[data-sys]'); if(!b) return; if(b.dataset.sys==='histo'){ if(mode!=='histoloji') location.hash='#histoloji/'+hId; return; } if(mode==='histoloji'){ asys=b.dataset.sys; try{ localStorage.setItem('kalp.asys',asys); }catch(e){} location.hash='#anatomi'; return; } setSys(b.dataset.sys); });
 renderSysbar();
 function navAnatomy(){
   const q=LC(query.trim());
@@ -132,18 +134,20 @@ function navAnatomy(){
   return html;
 }
 let navOpen=false;
+const VISC=()=>Object.keys(COND).filter(k=>!COND[k].hid);
 function navConds(){
   const c=COND[condKey];
-  return `<button class="navtog" type="button" data-navtog aria-expanded="${navOpen}"><span><small>Senaryo seç · ${Object.keys(COND).length} durum</small>${esc(c.n)}</span><i aria-hidden="true">▾</i></button><div class="navbody">`+progHTML('d',Object.keys(COND),'Çalışılan durum')+CATS.map(([k,nm])=>`<div class="grp-h">${esc(nm)}</div>`+Object.entries(COND).filter(([,c])=>c.cat===k).map(([key,c])=>`<button class="item cond" type="button" data-cond="${key}" aria-current="${key===condKey}">${esc(c.n)}${CASES.some(x=>x.cond===key)?'<span class="vtag" title="Bu durum için hasta vakası var">Vaka</span>':''}${seenDot('d',key)}</button>`).join('')).join('')+`</div>`;
+  return `<button class="navtog" type="button" data-navtog aria-expanded="${navOpen}"><span><small>Senaryo seç · ${VISC().length} durum</small>${esc(c.n)}</span><i aria-hidden="true">▾</i></button><div class="navbody">`+`<a class="item ylink" href="#yol/${yId}"><i class="k" style="background:#7b61ff"></i>${LG('Hastalıklar 5 katmanda: anatomiden vakaya','Diseases in 5 layers: from anatomy to case')}</a>`+progHTML('d',VISC(),'Çalışılan durum')+CATS.map(([k,nm])=>`<div class="grp-h">${esc(nm)}</div>`+Object.entries(COND).filter(([,c])=>c.cat===k).map(([key,c])=>`<button class="item cond" type="button" data-cond="${key}" aria-current="${key===condKey}">${esc(c.n)}${CASES.some(x=>x.cond===key)?'<span class="vtag" title="Bu durum için hasta vakası var">Vaka</span>':''}${seenDot('d',key)}</button>`).join('')).join('')+`</div>`;
 }
 function renderNav(){
   const ae=document.activeElement&&document.activeElement.id==='search', pos=ae?$('search').selectionStart:0;
   if(mode==='ana'){ nav.innerHTML=''; return; }
-  nav.innerHTML= mode==='anatomi'?navAnatomy():mode==='ogren'?navLearn():mode==='sina'?navQuiz():mode==='vaka'?navVaka():navConds();
+  nav.innerHTML= isLens(mode)?lensNav():mode==='anatomi'?navAnatomy():mode==='ogren'?navLearn():mode==='sina'?navQuiz():mode==='vaka'?navVaka():navConds();
   if(ae){const s=$('search'); if(s){ s.focus(); s.setSelectionRange(pos,pos);} }
 }
 nav.addEventListener('input',e=>{if(e.target.id==='search'){query=e.target.value; renderNav();}});
 nav.addEventListener('click',e=>{
+  if(isLens(mode)&&lensClick(e)) return;
   if(e.target.closest('[data-navtog]')){ navOpen=!navOpen; nav.classList.toggle('open',navOpen); renderNav(); return; }
   const vl=e.target.closest('[data-vlv]'); if(vl){ setVLevel(+vl.dataset.vlv); return; }
   const vc=e.target.closest('[data-vcase]'); if(vc){ openCard(); startCase(vc.dataset.vcase); return; }
@@ -162,11 +166,12 @@ function kindHTML(k){return `<span class="kind"><b style="background:${KCOL[k]||
 const closeBtn=`<button class="x" id="cardX" type="button" aria-label="Kartı kapat">×</button>`;
 function anatomyHTML(){
   if(!selected){ const X=SYSK[asys], mine=sysIds(asys), i=SYS.indexOf(X), nx=SYS[(i+1)%SYS.length], first=mine.find(id=>!isSeen('a',id))||mine[0];
-    return `${closeBtn}<div><div class="eyebrow">${LG('Anatomi','Anatomy')} · ${i+1}/${SYS.length}</div><h2>${esc(X.n)}</h2></div>
+    return `${closeBtn}<div>${lensEye('anatomi',`${i+1}/${SYS.length}`)}<h2>${esc(X.n)}</h2></div>
     <p>${esc(X.d)}</p>
     <p class="hint2">${LG('Kalbi sürükleyerek çevir, bir yapıya tıklayarak seç. Üstteki düğmelerden başka bir sisteme geçebilirsin.','Drag to rotate the heart and click a structure to select it. Use the buttons at the top to switch to another system.')}</p>
     <div class="actions"><button class="bigbtn" type="button" data-anext="${first}">${mine.some(id=>isSeen('a',id))?LG('Devam et','Continue'):LG('Bu sistemi başlat','Start this system')}<small>${esc(S[first].n)}</small></button>
       <button class="lnk" type="button" data-sys="${nx.k}">${LG('Sonraki sistem','Next system')}: ${esc(nx.n)} →</button></div>
+    <a class="lnk" href="#histoloji/${hId}">${LG('Doku ve hücre düzeyine in: Histoloji','Go down to tissue and cell level: Histology')} →</a>
     <div class="disc">${LG(`Bu sistemde ${mine.length} yapı var.`,`${mine.length} structures in this system.`)}</div>`; }
   const s=S[selected], par=s.p&&S[s.p];
   const kids=Object.keys(S).filter(k=>S[k].p===selected);
@@ -185,6 +190,8 @@ function anatomyHTML(){
     ${s.note?`<div class="note">${esc(s.note)}</div>`:''}
     ${kids.length?`<div><div class="eyebrow" style="margin-bottom:6px">Dalları ve bölümleri</div><div class="chips">${kids.map(chip).join('')}</div></div>`:''}
     ${sibs.length?`<div><div class="eyebrow" style="margin-bottom:6px">Komşu dallar</div><div class="chips">${sibs.map(chip).join('')}</div></div>`:''}
+    ${(()=>{ const hs=ORG.HISTO.filter(h=>h.part===selected||h.part===s.p); return hs.length?`<div><div class="eyebrow" style="margin-bottom:6px">${LG('Mikroskopta','Under the microscope')}</div><div class="lchips">${hs.map(h=>lchip('h:'+h.id)).join('')}</div></div>`:''; })()}
+    ${stripHTML('a:'+selected,'anatomi')}
     ${anext?`<div class="actions"><button class="bigbtn" type="button" data-anext="${anext}">Sonraki yapı<small>${esc(S[anext].n)}</small></button></div>`:`<div class="actions"><button class="bigbtn" type="button" data-sys="${nsys.k}">${LG('Sistem bitti, sonraki sistem','System done, next system')}<small>${esc(nsys.n)}</small></button></div>`}`;
 }
 function stateOf(id){
@@ -212,19 +219,22 @@ function condHTML(){
   const go=cs?`<button class="vgo" type="button" data-gocase="${cs.id}"><i aria-hidden="true">▶</i>Bu durumu vakada dene</button>`:'';
   const order=CATS.flatMap(([k])=>Object.keys(COND).filter(x=>COND[x].cat===k)), nx=COND[order[(order.indexOf(condKey)+1)%order.length]];
   const catN=(CATS.find(x=>x[0]===c.cat)||[])[1];
-  return `${closeBtn}<div><div class="pills">${catN?`<span class="pill g">${esc(catN)}</span>`:''}${cs?'<span class="pill">Vaka var</span>':''}${isSeen('d',condKey)?'<span class="pill r">Çalışıldı</span>':''}</div><h2>${esc(c.n)}</h2><div class="sub2">${esc(c.tag)}</div></div>
+  return `${closeBtn}<div>${lensEye('fizyopatoloji')}<div class="pills">${catN?`<span class="pill g">${esc(catN)}</span>`:''}${cs?'<span class="pill">Vaka var</span>':''}${isSeen('d',condKey)?'<span class="pill r">Çalışıldı</span>':''}</div><h2>${esc(c.n)}</h2><div class="sub2">${esc(c.tag)}</div></div>
     <div class="beats"><span class="beat"><i id="bA"></i>Atriyumlar</span><span class="beat"><i id="bV"></i>Ventriküller</span></div>
     <p>${esc(c.sum)}</p>
     ${read}
     <div class="legend">${leg.join('')}</div>
-    <details open><summary>Neden olur?</summary><ul class="key">${(c.why||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></details>
-    <details><summary>Nasıl olur? (mekanizma)</summary><p class="long">${esc(c.how||'')}</p></details>
-    <details><summary>EKG’de ne görülür?</summary><ul class="key">${c.ecg.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></details>
+    <details open><summary><b class="stepn">1</b>${LG('Neden','Cause')}</summary><ul class="key">${(c.why||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></details>
+    <details><summary><b class="stepn">2</b>${LG('Mekanizma','Mechanism')}</summary><p class="long">${esc(c.how||'')}</p></details>
+    ${c.bul?`<details><summary><b class="stepn">3</b>${LG('Bulgular','Findings')}</summary><ul class="key">${c.bul.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></details>`:''}
+    <details><summary><b class="stepn">4</b>${LG('EKG ve laboratuvar','ECG and laboratory')}</summary><ul class="key">${c.ecg.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>${c.lab?`<div class="eyebrow" style="margin:10px 0 6px">${LG('Laboratuvar ve görüntüleme','Laboratory and imaging')}</div><ul class="key">${c.lab.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}</details>
     <details><summary>Kaslar ve ileti yolları</summary><dl class="facts">
       <div><dt>Kaslar</dt><dd>${esc(c.mus)}</dd></div>
       <div><dt>İleti yolları ve sinirler</dt><dd>${esc(c.ner)}</dd></div>
     </dl></details>
-    ${c.cli?`<details><summary>Klinikte</summary><p class="long">${esc(c.cli)}</p></details>`:''}
+    ${c.cli?`<details><summary>${LG('Klinikte ve tedavi','In the clinic and treatment')}</summary><p class="long">${esc(c.cli)}</p></details>`:''}
+    ${(()=>{ const ds=ORG.FARMA.filter(d=>d.before===condKey||d.after===condKey||yollarFor('p:'+condKey).some(y=>y.d[0].includes('d:'+d.id))), ms=ORG.MIKRO.filter(m=>m.cond===condKey); return ds.length||ms.length?`<div><div class="eyebrow" style="margin-bottom:6px">${LG('Farmakoloji ve mikrobiyoloji','Pharmacology and microbiology')}</div><div class="lchips">${ds.map(d=>lchip('d:'+d.id)).join('')}${ms.map(m=>lchip('m:'+m.id)).join('')}</div></div>`:''; })()}
+    ${stripHTML('p:'+condKey,'fizyopatoloji')}
     ${c.note?`<div class="note">${esc(c.note)}</div>`:''}
     ${sel}
     <div class="actions"><button class="bigbtn" type="button" data-condnext>Anladım, sonraki<small>${esc(nx.n)}</small></button>${go}</div>
@@ -234,13 +244,14 @@ let bA=null,bV=null;
 function render(){
   if(mode==='ana'){ renderHome(); return; }
   const dk=mode==='vaka'&&!vk.id; document.body.classList.toggle('deck',dk); deckEl.hidden=!dk; if(dk) renderDeck();
-  card.innerHTML = mode==='anatomi'?anatomyHTML():mode==='ogren'?learnHTML():mode==='sina'?quizHTML():mode==='vaka'?vakaHTML():condHTML();
+  card.innerHTML = isLens(mode)?lensCard():mode==='anatomi'?anatomyHTML():mode==='ogren'?learnHTML():mode==='sina'?quizHTML():mode==='vaka'?vakaHTML():condHTML();
   bA=$('bA'); bV=$('bV');
   card.classList.toggle('hide',!cardOpen);
   queueMicrotask(()=>renderParts());
 }
 card.addEventListener('click',e=>{
   if(e.target.id==='cardX'){cardOpen=false; card.classList.add('hide'); insets(); return;}
+  if(isLens(mode)&&lensClick(e)) return;
   const gc=e.target.closest('[data-gocase]'); if(gc){ location.hash='#vaka/'+gc.dataset.gocase; return; }
   if(e.target.closest('[data-condnext]')){ markSeen('d',condKey); const order=CATS.flatMap(([k])=>Object.keys(COND).filter(x=>COND[x].cat===k)); setCond(order[(order.indexOf(condKey)+1)%order.length]); card.scrollTop=0; return; }
   const an=e.target.closest('[data-anext]'); if(an){ select(an.dataset.anext); card.scrollTop=0; return; }
@@ -272,7 +283,7 @@ function select(id){
 
 /* ---------- Öğren ---------- */
 function navLearn(){
-  return progHTML('l',LESSONS.map(l=>l.id),'Tamamlanan ders')+`<div class="grp-h">Dersler</div>`+LESSONS.map((l,i)=>`<button class="item" type="button" data-lesson="${l.id}" aria-current="${l.id===lesson}"><span class="num">${i+1}</span>${esc(l.t)}${seenDot('l',l.id)}</button>`).join('')+
+  return `<a class="item" href="#fizyoloji/${fId}">← ${LG('Fizyoloji konuları','Physiology topics')}</a>`+progHTML('l',LESSONS.map(l=>l.id),'Tamamlanan ders')+`<div class="grp-h">${LG('EKG dersleri','ECG lessons')}</div>`+LESSONS.map((l,i)=>`<button class="item" type="button" data-lesson="${l.id}" aria-current="${l.id===lesson}"><span class="num">${i+1}</span>${esc(l.t)}${seenDot('l',l.id)}</button>`).join('')+
     `<div class="grp-h">Soru–cevap</div><button class="item" type="button" data-lesson="sss" aria-current="${lesson==='sss'}"><span class="num">?</span>Klinik soru–cevap (${FAQ.length})</button>`;
 }
 function learnHTML(){
@@ -417,7 +428,7 @@ const PKIND=[['kas','Odacıklar ve kas'],['kapak','Kapaklar'],['damar','Damarlar
 const PORDER=GROUPS.flatMap(g=>g[1]);
 let partsOpen=false, focusMode='ghost', othersOp=1;
 /* Anatomide bir yapı seçilince ona odaklan: kendisi dolu kalır, çevresi saydamlaşır. Parçalar paneli açıksa oradaki seçim geçerli. */
-const effFocus=()=>partsOpen?focusMode:(mode==='anatomi'?'ghost':'none');
+const effFocus=()=>partsOpen?focusMode:(mode==='anatomi'||mode==='histoloji'?'ghost':'none');
 function pname(id){ return S[id]?S[id].n:id; }
 function renderParts(){
   if(!partsOpen) return;
@@ -482,7 +493,11 @@ function setMode(m){
   if(prev==='anatomi'&&m!=='anatomi') leaveSys3D();
   if(heart&&heart.ready) heart.setFocus(effFocus());
   document.body.classList.remove('deck'); deckEl.hidden=true; if(flip) closeFlip();
-  ['anatomi','durumlar','ogren','sina','vaka'].forEach(k=>{const a=$('tab-'+k); if(k===m)a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current');});
+  const tabK=LENS_OF[m]?LENS_TAB[LENS_OF[m]]:m;
+  ['anatomi','fizyoloji','durumlar','farmakoloji','mikrobiyoloji','sina','vaka'].forEach(k=>{const a=$('tab-'+k); if(!a) return; if(k===tabK)a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current');});
+  if(!isLens(m)){ vizShow(null); scope.hidden=true; }
+  if(prev==='farmakoloji'&&m!=='farmakoloji'){ clearTimeout(dTimer); if(heart&&heart.treating&&heart.treating()) heart.stopTreat(); $('txcap').hidden=true; }
+  if(prev!==m&&(prev==='histoloji'||m==='histoloji'||m==='anatomi')) renderSysbar();
   if(m==='ana') $('brand').setAttribute('aria-current','page'); else $('brand').removeAttribute('aria-current');
   $('home').hidden=m!=='ana'; heart&&heart.setSpin&&heart.setSpin(m==='ana'&&!reduce);
   if(m!=='ana') try{ localStorage.setItem('kalp.last',location.hash||'#'+m); }catch(e){}
@@ -499,6 +514,9 @@ function setMode(m){
     selected=null; if(prev!=='ogren'||!sim.vent.length){ sim.setCondition('nsr'); xray.checked=true; } applyLearn3D();
     requestAnimationFrame(()=>{e12.classList.add('show'); setTimeout(()=>{size12(); insets();},650);});
     setLesson(lesson);
+  } else if(isLens(m)){
+    if(m!=='yol') selected=null;
+    enterLens(m,prev);
   } else if(m==='vaka'){
     e12.classList.remove('show'); if(lastView&&heart){heart.resetView(); lastView=false;}
     selected=null; xray.checked=false; heart&&heart.setXray(false); applyV3D(); render(); renderNav();
@@ -526,7 +544,12 @@ function fromHash(){
   else if(h[0]==='vaka'){ setMode('vaka'); if(h[1]&&CASES.some(c=>c.id===h[1])&&h[1]!==vk.id) startCase(h[1]); }
   else if(h[0]==='sina'){ if(h[1]&&['karisik','ecg','bul','bilgi'].includes(h[1])&&h[1]!==quiz.type){quiz.type=h[1]; quiz.cur=null;} setMode('sina'); }
   else if(h[0]==='ogren'){ if(h[1]&&(h[1]==='sss'||LESSONS.some(l=>l.id===h[1]))) lesson=h[1]; setMode('ogren'); }
-  else if(h[0]==='anatomi') setMode('anatomi');
+  else if(h[0]==='anatomi'){ setMode('anatomi'); if(h[1]&&S[h[1]]&&h[1]!==selected){ openCard(); select(h[1]); } }
+  else if(h[0]==='histoloji'){ if(h[1]&&HI[h[1]]){ if(h[1]!==hId) scopeOn=true; hId=h[1]; markSeen('h',hId); } setMode('histoloji'); }
+  else if(h[0]==='fizyoloji'){ if(h[1]&&FI[h[1]]){ if(h[1]!==fId) fCtl='norm'; fId=h[1]; markSeen('f',fId); } setMode('fizyoloji'); }
+  else if(h[0]==='farmakoloji'){ if(h[1]&&DI[h[1]]&&h[1]!==dId){ dId=h[1]; dStep=0; } markSeen('r',dId); setMode('farmakoloji'); }
+  else if(h[0]==='mikrobiyoloji'){ if(h[1]&&MI[h[1]]&&h[1]!==mId){ mId=h[1]; mStep=0; duke.clear(); jones.clear(); jgas=false; } markSeen('m',mId); setMode('mikrobiyoloji'); }
+  else if(h[0]==='yol'){ if(h[1]&&YI[h[1]]) yId=h[1]; markSeen('y',yId); setMode('yol'); }
   else setMode('ana');
 }
 window.addEventListener('hashchange',fromHash);
@@ -648,7 +671,7 @@ document.addEventListener('keydown',e=>{
 const tTorso=$('t-torso');
 function torsoWanted(){ return (mode==='durumlar'||(mode==='vaka'&&vk.id))&&tTorso.checked; }
 tTorso.addEventListener('change',()=>heart&&heart.setTorso(torsoWanted()));
-function ecgKey(){ return mode==='sina'&&quiz.cur?quiz.cur.key:mode==='vaka'&&vk.id?vk.cur:condKey; }
+function ecgKey(){ return mode==='sina'&&quiz.cur?quiz.cur.key:mode==='vaka'&&vk.id?vk.cur:mode==='yol'?sim.key:condKey; }
 function ecgLabels(){
   if(mode==='sina') return quiz.cur&&quiz.cur.done?'all':'none';
   if(mode==='vaka') return !vk.id?'none':vk.dx?'all':vk.lv===1?'basic':'none';
@@ -933,6 +956,290 @@ function rxApply(i){
   } else { if(r.next) switchCond(r.next); fin(); render(); }
 }
 
+/* ---------- Beş mercek: Anatomi + Histoloji → Fizyoloji → Fizyopatoloji → Farmakoloji → Mikrobiyoloji ----------
+   İçerik window.KALP.ORGANS.kalp (organ-kalp.js) içinden okunur; başka bir organ aynı yapıyla eklenebilir. */
+const ORG=window.KALP.ORGANS.kalp, VZ=window.KalpViz;
+const LENS_OF={anatomi:'anatomi',histoloji:'anatomi',fizyoloji:'fizyoloji',ogren:'fizyoloji',durumlar:'fizyopatoloji',yol:'fizyopatoloji',farmakoloji:'farmakoloji',mikrobiyoloji:'mikrobiyoloji'};
+const LENS_TAB={anatomi:'anatomi',fizyoloji:'fizyoloji',fizyopatoloji:'durumlar',farmakoloji:'farmakoloji',mikrobiyoloji:'mikrobiyoloji'};
+const LENS_HASH={anatomi:'#anatomi',fizyoloji:'#fizyoloji',fizyopatoloji:'#durumlar',farmakoloji:'#farmakoloji',mikrobiyoloji:'#mikrobiyoloji'};
+const LCOL={anatomi:'#ef6a5b',fizyoloji:'#0e8f7e',fizyopatoloji:'#7b61ff',farmakoloji:'#2b8be0',mikrobiyoloji:'#c7792f',vaka:'#1b2333'};
+const byId=a=>Object.fromEntries(a.map(x=>[x.id,x]));
+const HI=byId(ORG.HISTO), FI=byId(ORG.FIZYO), DI=byId(ORG.FARMA), MI=byId(ORG.MIKRO), YI=byId(ORG.YOLLAR);
+const LX=k=>ORG.LENSES.find(l=>l.k===k), LI=k=>ORG.LENSES.findIndex(l=>l.k===k);
+let hId=ORG.HISTO[0].id, fId=ORG.FIZYO[0].id, fCtl='norm', dId=ORG.FARMA[0].id, dStep=0, mId=ORG.MIKRO[0].id, mStep=0, yId=ORG.YOLLAR[0].id;
+let scopeOn=true, plaque=false, dBusy=false, dTimer=null, scopeT=null;
+const duke=new Set(), jones=new Set(); let jgas=false;
+const LENS_MODES=['histoloji','fizyoloji','farmakoloji','mikrobiyoloji','yol'];
+const isLens=m=>LENS_MODES.includes(m);
+/* Bağlantı çözümü: 'a:mit' → {lens, ad, adres} */
+function refInfo(ref){
+  const i=ref.indexOf(':'), k=ref.slice(0,i), id=ref.slice(i+1);
+  if(k==='a'&&S[id]) return {L:'anatomi',n:S[id].n,h:'#anatomi/'+id};
+  if(k==='h'&&HI[id]) return {L:'anatomi',n:HI[id].n,h:'#histoloji/'+id,sub:LG('Histoloji','Histology')};
+  if(k==='f'&&FI[id]) return {L:'fizyoloji',n:FI[id].n,h:'#fizyoloji/'+id};
+  if(k==='l'){ const l=LESSONS.find(x=>x.id===id); if(l) return {L:'fizyoloji',n:l.t,h:'#ogren/'+id,sub:LG('EKG dersi','ECG lesson')}; }
+  if(k==='p'&&COND[id]) return {L:'fizyopatoloji',n:COND[id].n,h:'#durumlar/'+id};
+  if(k==='d'&&DI[id]) return {L:'farmakoloji',n:DI[id].n,h:'#farmakoloji/'+id};
+  if(k==='m'&&MI[id]) return {L:'mikrobiyoloji',n:MI[id].n,h:'#mikrobiyoloji/'+id};
+  if(k==='v'){ const c=CASES.find(x=>x.id===id); if(c) return {L:'vaka',n:c.title,h:'#vaka/'+id,sub:LG('Vaka','Case')}; }
+  if(k==='y'&&YI[id]) return {L:'fizyopatoloji',n:YI[id].n,h:'#yol/'+id};
+  return null;
+}
+const lchip=ref=>{ const r=refInfo(ref); return r?`<a class="lchip" href="${r.h}"><i style="background:${LCOL[r.L]}"></i>${r.sub?`<small>${esc(r.sub)}</small>`:''}${esc(r.n)}</a>`:''; };
+const YL=['a','f','p','d','m'], YLK={a:'anatomi',f:'fizyoloji',p:'fizyopatoloji',d:'farmakoloji',m:'mikrobiyoloji'};
+const yollarFor=ref=>ORG.YOLLAR.filter(y=>YL.some(L=>y[L][0].includes(ref))||('v:'+y.vaka)===ref);
+/* Bir konunun kartında: bu konu hangi hastalık yolunda, beş katman şeridi */
+function stripHTML(ref,lensK){
+  const ys=yollarFor(ref); if(!ys.length) return '';
+  const y=ys[0];
+  const items=YL.map((L,i)=>{ const rs=y[L][0], k=YLK[L], on=k===lensK, first=rs[0], href=first?refInfo(first).h:'#yol/'+y.id;
+    return `<li class="${on?'on':''}${rs.length?'':' none'}"><a href="${href}" title="${esc(y[L][1])}"><b style="--c:${LCOL[k]}">${i+1}</b><span>${esc(LG(...({anatomi:['Anatomi','Anatomy'],fizyoloji:['Fizyo','Physio'],fizyopatoloji:['Pato','Patho'],farmakoloji:['Farma','Pharm'],mikrobiyoloji:['Mikro','Micro']}[k]||[LX(k).s,LX(k).s])))}</span></a></li>`; }).join('');
+  const more=ys.slice(1).map(o=>`<a class="lnk2" href="#yol/${o.id}">${esc(o.n)}</a>`).join('');
+  return `<div class="lstrip"><div class="lsh"><span class="eyebrow">${LG('Bu hastalık 5 katmanda','This disease in 5 layers')}</span><a href="#yol/${y.id}">${esc(y.n)} →</a></div>
+    <ol>${items}<li class="vk"><a href="#vaka/${y.vaka}"><b>▶</b><span>${LG('Vaka','Case')}</span></a></li></ol>${more?`<div class="lsmore">${LG('Ayrıca:','Also:')} ${more}</div>`:''}</div>`;
+}
+const lensEye=(k,extra)=>`<div class="eyebrow">${LG('Mercek','Lens')} ${LI(k)+1}/5 · ${esc(LX(k).n)}${extra?' · '+esc(extra):''}</div>`;
+const ptsHTML=pts=>`<dl class="facts">${pts.map(([a,b])=>`<div><dt>${esc(a)}</dt><dd>${esc(b)}</dd></div>`).join('')}</dl>`;
+const nextB2=(attr,n)=>`<button class="bigbtn" type="button" ${attr}>${LG('Anladım, sonraki','Got it, next')}<small>${esc(n)}</small></button>`;
+
+/* --- Görsel paneli (#viz) --- */
+const viz=$('viz'), vzCv=$('vzCv'), vzSvg=$('vzSvg'), vzEcg=$('vzEcg'), vzEcgBox=$('vzEcgBox');
+const phys=VZ.physio(vzCv);
+if(window.ResizeObserver) new ResizeObserver(()=>{ phys.resize(); sizeMini(); }).observe(viz);
+function vizShow(kind){ // kind: 'cv' | 'svg' | 'svg+ecg' | null
+  if(!kind){ viz.classList.remove('show'); return; }
+  viz.dataset.kind=kind; vzCv.hidden=kind!=='cv'; vzSvg.hidden=kind==='cv'; vzEcgBox.hidden=kind!=='svg+ecg';
+  if(!viz.classList.contains('show')) requestAnimationFrame(()=>{ viz.classList.add('show'); setTimeout(()=>{phys.resize(); sizeMini(); insets();},650); });
+  else { phys.resize(); sizeMini(); }
+}
+const vzx=vzEcg.getContext('2d');
+function sizeMini(){ const r=vzEcg.getBoundingClientRect(), d=Math.min(2,window.devicePixelRatio||1); if(!r.width) return; vzEcg.width=Math.round(r.width*d); vzEcg.height=Math.round(r.height*d); vzx.setTransform(d,0,0,d,0,0); }
+function drawMini(){
+  const W=vzEcg.clientWidth, H=vzEcg.clientHeight; if(!W||!H) return; if(vzEcg.width<10) sizeMini();
+  const win=3.2, pps=W/win, ppmv=Math.min(H*0.34,pps*0.4), base=H*0.62, t0=sim.t-win;
+  vzx.fillStyle=PAPER; vzx.fillRect(0,0,W,H); vzx.lineWidth=1;
+  for(let k=Math.ceil(t0/0.2);k*0.2<=sim.t;k++){ const x=(k*0.2-t0)*pps; vzx.strokeStyle=GRID2; vzx.beginPath(); vzx.moveTo(x+.5,0); vzx.lineTo(x+.5,H); vzx.stroke(); }
+  vzx.strokeStyle=ECG; vzx.lineWidth=1.6; vzx.beginPath(); for(let i=0;i<=W;i+=1){ const v=sim.ecgAt(t0+i/pps); i?vzx.lineTo(i,base-v*ppmv):vzx.moveTo(i,base-v*ppmv); } vzx.stroke();
+}
+function vizCtl(html){ $('vzCtl').innerHTML=html; }
+$('vzCtl').addEventListener('click',e=>{
+  const c=e.target.closest('[data-fctl]'); if(c){ fCtl=c.dataset.fctl; applyFizyo(); render(); return; }
+  const s=e.target.closest('[data-dstep]'); if(s){ setDStep(+s.dataset.dstep); return; }
+  const m=e.target.closest('[data-mstep]'); if(m){ mStep=+m.dataset.mstep; applyMikro(); render(); return; }
+});
+
+/* --- 3D yardımcıları --- */
+function lensCond(k){ sim.setCondition(k); if(heart&&heart.ready){ heart.setMode('durumlar',COND[k],k); } }
+function partFocus(id,xr){ selected=id&&S[id]?id:null; if(!heart||!heart.ready) return; heart.setXray(!!xr); xray.checked=!!xr; heart.select(selected); }
+
+/* --- Histoloji --- */
+function navHisto(){ return progHTML('h',ORG.HISTO.map(x=>x.id),LG('İncelenen doku','Tissues studied'))+`<div class="grp-h">${LG('Histoloji','Histology')}<span>${ORG.HISTO.length}</span></div>`+
+  ORG.HISTO.map((x,i)=>`<button class="item" type="button" data-histo="${x.id}" aria-current="${x.id===hId}"><span class="num">${i+1}</span>${esc(x.n)}${seenDot('h',x.id)}</button>`).join(''); }
+function histoHTML(){
+  const x=HI[hId], i=ORG.HISTO.indexOf(x), nx=ORG.HISTO[(i+1)%ORG.HISTO.length];
+  return `${closeBtn}<div>${lensEye('anatomi',LG('Histoloji','Histology'))}<h2>${esc(x.n)}</h2><div class="sub2">${esc(x.mag)} · ${esc(x.boya)} · ${esc(S[x.part]?S[x.part].n:'')}</div></div>
+    <p>${esc(x.d)}</p>
+    <div class="actions row"><button class="btn" type="button" data-scope>${scopeOn?LG('3D modele dön','Back to 3D model'):LG('Mikroskopla yakınlaş','Zoom in with the microscope')}</button>${x.id==='koroner'?`<button class="btn" type="button" data-plaque aria-pressed="${plaque}">${esc(x.lb.plaque)}</button>`:''}</div>
+    ${ptsHTML(x.pts)}
+    <div class="note"><b>${LG('Klinik bağlantı','Clinical link')}:</b> ${esc(x.klinik)}</div>
+    ${stripHTML('h:'+x.id,'anatomi')}
+    <div class="actions">${nextB2(`data-hnext="${nx.id}"`,nx.n)}</div>`;
+}
+function scopeHTML(){ const x=HI[hId]; return `<div class="scw"><div class="scbar"><b>${esc(x.mag)}</b><span>${esc(x.boya)}</span><button type="button" class="x2" data-scope aria-label="${LG('Mikroskobu kapat','Close microscope')}">×</button></div>${VZ.histo(hId,x.lb,{plaque})}</div>`; }
+const scope=$('scope');
+function applyHisto(fly){
+  if(mode!=='histoloji') return; const x=HI[hId];
+  if(heart&&heart.ready){ heart.setMode('anatomi'); heart.setLayer('cond',x.part==='sa'||x.part==='purk'); heart.setLayer('vessels',true); heart.setLayer('nerves',false); heart.setDim({}); partFocus(x.part,['sa','purk','mit','tri','aov'].includes(x.part)); }
+  clearTimeout(scopeT); scope.innerHTML=scopeHTML(); scope.classList.remove('in');
+  if(scopeOn){ scope.hidden=false; scopeT=setTimeout(()=>scope.classList.add('in'),fly===false||reduce?0:650); } else scope.hidden=true;
+}
+function setHisto(id){ if(!HI[id]) return; hId=id; markSeen('h',id); if(history.replaceState) history.replaceState(null,'','#histoloji/'+id); scopeOn=true; applyHisto(); render(); renderNav(); }
+scope.addEventListener('click',e=>{ if(e.target.closest('[data-scope]')){ scopeOn=false; applyHisto(); render(); } });
+
+/* --- Fizyoloji --- */
+function navFizyo(){
+  return progHTML('f',ORG.FIZYO.map(x=>x.id),LG('Çalışılan konu','Topics studied'))+`<div class="grp-h">${LG('Normal işleyiş','Normal function')}<span>${ORG.FIZYO.length}</span></div>`+
+    ORG.FIZYO.map((x,i)=>`<button class="item" type="button" data-fizyo="${x.id}" aria-current="${x.id===fId&&mode==='fizyoloji'}"><span class="num">${i+1}</span>${esc(x.n)}${seenDot('f',x.id)}</button>`).join('')+
+    `<div class="grp-h">${LG('Elektrokardiyografi (12 derivasyon)','Electrocardiography (12 leads)')}<span>${LESSONS.length}</span></div>`+
+    LESSONS.map((l,i)=>`<a class="item" href="#ogren/${l.id}"><span class="num">${i+1}</span>${esc(l.t)}${seenDot('l',l.id)}</a>`).join('');
+}
+function fizyoHTML(){
+  const x=FI[fId], i=ORG.FIZYO.indexOf(x), nx=ORG.FIZYO[i+1];
+  return `${closeBtn}<div>${lensEye('fizyoloji')}<h2>${esc(x.n)}</h2></div>
+    <p>${esc(x.d)}</p>
+    ${x.ctl?`<div class="seg2" role="group">${x.ctl.map(([k,n])=>`<button type="button" data-fctl="${k}" aria-pressed="${fCtl===k}">${esc(n)}</button>`).join('')}</div>`:''}
+    ${ptsHTML(x.pts)}
+    <div class="note"><b>${LG('Klinik bağlantı','Clinical link')}:</b> ${esc(x.klinik)}</div>
+    ${x.links&&x.links.length?`<div><div class="eyebrow" style="margin-bottom:6px">${LG('İlgili konular','Related topics')}</div><div class="lchips">${x.links.map(lchip).join('')}</div></div>`:''}
+    ${stripHTML('f:'+x.id,'fizyoloji')}
+    <div class="actions">${nx?nextB2(`data-fnext="${nx.id}"`,nx.n):`<a class="bigbtn" href="#ogren/nedir">${LG('Sırada: EKG okuma','Next: reading the ECG')}<small>${esc(LESSONS[0].t)}</small></a>`}</div>`;
+}
+function applyFizyo(){
+  if(mode!=='fizyoloji') return; const x=FI[fId];
+  if(!(x.ctl||[]).some(c=>c[0]===fCtl)) fCtl=x.ctl?x.ctl[0][0]:'norm';
+  const k=x.id==='ap_sa'&&fCtl==='symp'?'tachy':x.id==='ap_sa'&&fCtl==='vag'?'brady':x.id==='koroner'&&fCtl==='tachy'?'tachy':x.id==='otonom'?(fCtl==='up'?'brady':'tachy'):x.cond;
+  if(sim.key!==k) lensCond(k);
+  partFocus(x.part,['sa','avn','mit','purk'].includes(x.part));
+  $('vzEye').textContent=LG('Fizyoloji','Physiology'); $('vzTitle').textContent=x.n;
+  vizCtl((x.ctl||[]).map(([kk,n])=>`<button class="mbtn" type="button" data-fctl="${kk}" aria-pressed="${fCtl===kk}">${esc(n)}</button>`).join(''));
+  vizShow('cv'); phys.set(x.viz,fCtl,x.lb);
+}
+function setFizyo(id){ if(!FI[id]) return; if(id!==fId) fCtl='norm'; fId=id; markSeen('f',id); if(history.replaceState) history.replaceState(null,'','#fizyoloji/'+id); applyFizyo(); render(); renderNav(); }
+
+/* --- Farmakoloji --- */
+function navFarma(){
+  return progHTML('r',ORG.FARMA.map(x=>x.id),LG('Çalışılan ilaç','Drugs studied'))+ORG.FARMA_GRP.map(([g,n])=>`<div class="grp-h">${esc(n)}</div>`+ORG.FARMA.filter(x=>x.grp===g).map(x=>`<button class="item" type="button" data-farma="${x.id}" aria-current="${x.id===dId}"><i class="k" style="background:${LCOL.farmakoloji}"></i>${esc(x.n)}${seenDot('r',x.id)}</button>`).join('')).join('');
+}
+const LVN2={no:LG('Kontrendike','Contraindicated'),warn:LG('Dikkat','Caution'),info:LG('Bilgi','Note')};
+function rxRules(x){ // hasta oluşturucudaki aynı ilaçların hastaya özel uyarıları
+  const re=new RegExp(x.rx,'i'), seenK=new Set(), out=[];
+  for(const k in window.KALP.RX||{}) for(const r of window.KALP.RX[k]||[]){ if(!re.test(r.n+' '+(r.cls||''))) continue;
+    for(const [key,l,w] of r.rules||[]){ const kk=key.replace('!',''); if(seenK.has(kk+l)) continue; seenK.add(kk+l); out.push([kk,l,w]); } }
+  return out.sort((a,b)=>({no:0,warn:1,info:2}[a[1]]-{no:0,warn:1,info:2}[b[1]])).slice(0,8);
+}
+function farmaHTML(){
+  const x=DI[dId], i=ORG.FARMA.indexOf(x), nx=ORG.FARMA[(i+1)%ORG.FARMA.length], rules=rxRules(x);
+  const ul=a=>`<ul class="key">${a.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`;
+  return `${closeBtn}<div>${lensEye('farmakoloji',(ORG.FARMA_GRP.find(g=>g[0]===x.grp)||[])[1])}<h2>${esc(x.n)}</h2><div class="sub2">${esc(x.ex)}</div></div>
+    <dl class="read one"><div><dt>${LG('Hedef','Target')}</dt><dd>${esc(x.hedef)}</dd></div></dl>
+    <ol class="dsteps">${x.steps.map((s,k)=>`<li class="${k===dStep?'on':k<dStep?'done':''}"><button type="button" data-dstep="${k}"><b>${k+1}</b><span>${esc(s)}</span></button></li>`).join('')}</ol>
+    <div class="actions row">${dStep<3?`<button class="btn qnext" type="button" data-dstep="${dStep+1}">${dStep===2?LG('İlacı ver','Give the drug'):LG('Sonraki adım','Next step')} →</button>`:`<button class="btn" type="button" data-dstep="0">${LG('Baştan izle','Watch again')}</button>`}</div>
+    <p class="long">${esc(x.mek)}</p>
+    <div class="note"><b>${LG('EKG','ECG')}:</b> ${esc(x.ekg)}</div>
+    <details open><summary>${LG('Endikasyonlar','Indications')}</summary>${ul(x.end)}</details>
+    <details><summary>${LG('Kontrendikasyonlar','Contraindications')}</summary>${ul(x.kontr)}</details>
+    <details><summary>${LG('Yan etkiler ve etkileşimler','Adverse effects and interactions')}</summary>${ul(x.yan)}</details>
+    ${rules.length?`<details><summary>${LG('Hasta oluşturucudaki uyarılar','Warnings in the patient builder')}</summary><ul class="rxw">${rules.map(([k,l,w])=>`<li class="${l}"><span class="pill2">${esc(LVN2[l]||l)}</span><b>${esc(HASTA_ALL[k]||k)}</b> ${esc(w)}</li>`).join('')}</ul></details>`:''}
+    <div class="note"><b>${LG('Klinik inci','Clinical pearl')}:</b> ${esc(x.klinik)}</div>
+    ${stripHTML('d:'+x.id,'farmakoloji')}
+    <div class="actions">${nextB2(`data-dnext="${nx.id}"`,nx.n)}</div>`;
+}
+function setDStep(k){
+  const x=DI[dId]; dStep=Math.max(0,Math.min(3,k)); clearTimeout(dTimer);
+  if(heart&&heart.treating&&heart.treating()) heart.stopTreat(); $('txcap').hidden=true; dBusy=false;
+  if(dStep<3){ if(sim.key!==x.before) lensCond(x.before); }
+  else {
+    const go=()=>{ if(x.mid){ lensCond(x.mid); dTimer=setTimeout(()=>{ lensCond(x.after); drawFarmaViz(); },3200); } else lensCond(x.after); drawFarmaViz(); };
+    if(heart&&heart.ready&&!reduce){ dBusy=true; const cap=$('txcap'); cap.textContent=x.ex.split(/[,·(]/)[0].trim(); cap.hidden=false;
+      heart.treat('iv',{c:0x2b8be0,onFire:go,onDone:()=>{ dBusy=false; cap.hidden=true; }}); }
+    else go();
+  }
+  drawFarmaViz(); render();
+}
+function drawFarmaViz(){
+  const x=DI[dId]; vzSvg.innerHTML=VZ.mech(x.sc,dStep,{out:LG('Hücre dışı','Extracellular'),inn:LG('Hücre içi','Intracellular'),inactive:LG('Etkisiz','Inactive')},x.id);
+  $('vzEcgLbl').textContent=COND[sim.key]?COND[sim.key].n:'';
+}
+function applyFarma(){
+  if(mode!=='farmakoloji') return; const x=DI[dId];
+  lensCond(dStep>=3?x.after:x.before); partFocus(x.part,['avn','sa'].includes(x.part));
+  $('vzEye').textContent=LG('Hücre düzeyinde','At cell level'); $('vzTitle').textContent=x.n;
+  vizCtl([0,1,2,3].map(k=>`<button class="mbtn" type="button" data-dstep="${k}" aria-pressed="${dStep===k}">${k+1}</button>`).join(''));
+  vizShow(x.sc.t==='zin'&&x.before===x.after?'svg':'svg+ecg'); drawFarmaViz();
+}
+function setFarma(id){ if(!DI[id]) return; dId=id; dStep=0; markSeen('r',id); if(history.replaceState) history.replaceState(null,'','#farmakoloji/'+id); applyFarma(); render(); renderNav(); }
+
+/* --- Mikrobiyoloji --- */
+function navMikro(){ return progHTML('m',ORG.MIKRO.map(x=>x.id),LG('Çalışılan konu','Topics studied'))+`<div class="grp-h">${LG('Enfeksiyöz kalp hastalıkları','Infectious heart disease')}</div>`+
+  ORG.MIKRO.map((x,i)=>`<button class="item" type="button" data-mikro="${x.id}" aria-current="${x.id===mId}"><span class="num">${i+1}</span>${esc(x.n)}${seenDot('m',x.id)}</button>`).join(''); }
+function dukeRes(){ const M=[...duke].filter(k=>k[0]==='M').length, m=[...duke].filter(k=>k[0]==='m').length, D=ORG.DUKE;
+  return (M>=2||(M>=1&&m>=3)||m>=5)?['def',D.res.def]:((M>=1&&m>=1)||m>=3)?['pos',D.res.pos]:['rej',D.res.rej]; }
+function jonesRes(){ const M=[...jones].filter(k=>k[0]==='M').length, m=[...jones].filter(k=>k[0]==='m').length, J=ORG.JONES, ok=M>=2||(M>=1&&m>=2);
+  return !ok?['rej',J.res.rej]:jgas?['def',J.res.def]:['pos',J.res.nogas]; }
+function taniHTML(x){
+  if(x.tani==='duke'){ const D=ORG.DUKE, r=dukeRes();
+    return `<div class="calc"><div class="eyebrow">${LG('Tanı: Duke ölçütleri (2023 ESC)','Diagnosis: Duke criteria (2023 ESC)')}</div>
+      <b class="ch">${LG('Majör','Major')}</b>${D.major.map((t,i)=>`<label class="ck"><input type="checkbox" data-duke="M${i}" ${duke.has('M'+i)?'checked':''}><span>${esc(t)}</span></label>`).join('')}
+      <b class="ch">${LG('Minör','Minor')}</b>${D.minor.map((t,i)=>`<label class="ck"><input type="checkbox" data-duke="m${i}" ${duke.has('m'+i)?'checked':''}><span>${esc(t)}</span></label>`).join('')}
+      <div class="cres ${r[0]}" aria-live="polite">${esc(r[1])}</div><p class="hint2">${esc(D.rule)}</p></div>`; }
+  if(x.tani==='jones'){ const J=ORG.JONES, r=jonesRes();
+    return `<div class="calc"><div class="eyebrow">${LG('Tanı: revize Jones ölçütleri (2015 AHA)','Diagnosis: revised Jones criteria (2015 AHA)')}</div>
+      <label class="ck gas"><input type="checkbox" data-jgas ${jgas?'checked':''}><span>${esc(J.gas)}</span></label>
+      <b class="ch">${LG('Majör','Major')}</b>${J.major.map((t,i)=>`<label class="ck"><input type="checkbox" data-jones="M${i}" ${jones.has('M'+i)?'checked':''}><span>${esc(t)}</span></label>`).join('')}
+      <b class="ch">${LG('Minör','Minor')}</b>${J.minor.map((t,i)=>`<label class="ck"><input type="checkbox" data-jones="m${i}" ${jones.has('m'+i)?'checked':''}><span>${esc(t)}</span></label>`).join('')}
+      <div class="cres ${r[0]}" aria-live="polite">${esc(r[1])}</div><p class="hint2">${esc(J.rule)}</p></div>`; }
+  return '';
+}
+function mikroHTML(){
+  const x=MI[mId], i=ORG.MIKRO.indexOf(x), nx=ORG.MIKRO[(i+1)%ORG.MIKRO.length];
+  return `${closeBtn}<div>${lensEye('mikrobiyoloji')}<h2>${esc(x.n)}</h2></div>
+    <p>${esc(x.d)}</p>
+    <div><div class="eyebrow" style="margin-bottom:6px">${LG('Etkenler','Organisms')}</div><div class="etk">${x.etken.map(([a,b,c])=>`<div><b>${esc(a)}</b><small>${esc(b)}</small><span>${esc(c)}</span></div>`).join('')}</div></div>
+    <div><div class="eyebrow" style="margin-bottom:6px">${LG('Patogenez','Pathogenesis')}</div><ol class="dsteps">${x.pat.map((s,k)=>`<li class="${k===mStep?'on':k<mStep?'done':''}"><button type="button" data-mstep="${k}"><b>${k+1}</b><span>${esc(s)}</span></button></li>`).join('')}</ol>
+      ${mStep<3?`<button class="btn qnext" type="button" data-mstep="${mStep+1}">${LG('Sonraki adım','Next step')} →</button>`:''}</div>
+    ${taniHTML(x)}
+    <details open><summary>${LG('Tedavi','Treatment')}</summary><ul class="key">${x.tedavi.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></details>
+    <div class="note"><b>${LG('Korunma','Prevention')}:</b> ${esc(x.korunma)}</div>
+    ${x.links?`<div><div class="eyebrow" style="margin-bottom:6px">${LG('Diğer katmanlarda','In the other layers')}</div><div class="lchips">${x.links.map(lchip).join('')}</div></div>`:''}
+    ${stripHTML('m:'+x.id,'mikrobiyoloji')}
+    <div class="actions">${nextB2(`data-mnext="${nx.id}"`,nx.n)}</div>`;
+}
+function applyMikro(){
+  if(mode!=='mikrobiyoloji') return; const x=MI[mId];
+  if(sim.key!==x.cond) lensCond(x.cond); partFocus(x.part,!!x.xray);
+  $('vzEye').textContent=LG('Patogenez','Pathogenesis'); $('vzTitle').textContent=x.n;
+  vizCtl(x.pat.map((_,k)=>`<button class="mbtn" type="button" data-mstep="${k}" aria-pressed="${mStep===k}">${k+1}</button>`).join(''));
+  vizShow('svg'); vzSvg.innerHTML=VZ.micro(x.id,mStep,x.lb);
+}
+function setMikro(id){ if(!MI[id]) return; if(id!==mId){ mStep=0; duke.clear(); jones.clear(); jgas=false; } mId=id; markSeen('m',id); if(history.replaceState) history.replaceState(null,'','#mikrobiyoloji/'+id); applyMikro(); render(); renderNav(); }
+
+/* --- Hastalık yolları --- */
+function navYol(){ return progHTML('y',ORG.YOLLAR.map(x=>x.id),LG('Tamamlanan hastalık','Diseases completed'))+`<a class="item" href="#durumlar">← ${LG('Tüm durumlar','All conditions')}</a><div class="grp-h">${LG('Hastalıklar, 5 katmanda','Diseases in 5 layers')}<span>${ORG.YOLLAR.length}</span></div>`+
+  ORG.YOLLAR.map(y=>`<button class="item" type="button" data-yol="${y.id}" aria-current="${y.id===yId}"><i class="k" style="background:${LCOL.fizyopatoloji}"></i>${esc(y.n)}${seenDot('y',y.id)}</button>`).join(''); }
+function yolHTML(){
+  const y=YI[yId], i=ORG.YOLLAR.indexOf(y), nx=ORG.YOLLAR[(i+1)%ORG.YOLLAR.length], c=CASES.find(v=>v.id===y.vaka);
+  return `${closeBtn}<div><div class="eyebrow">${LG('Hastalık yolu · 5 katman ve vaka','Disease path · 5 layers and a case')}</div><h2>${esc(y.n)}</h2></div>
+    <p class="hint2">${LG('Hastalığı ders kitabındaki sırayla çalış: önce yapı, sonra normal işleyiş, sonra bozulma, ilaç ve etken. En sonda vakayı çöz.','Study the disease in textbook order: structure, normal function, what goes wrong, drugs and organism. Finish with the case.')}</p>
+    <ol class="ypath">${YL.map((L,k)=>{ const [rs,t]=y[L], lk=YLK[L];
+      return `<li style="--c:${LCOL[lk]}"><div class="yph"><b>${k+1}</b><span>${esc(LX(lk).n)}</span></div><p>${esc(t)}</p>${rs.length?`<div class="lchips">${rs.map(lchip).join('')}</div>`:''}</li>`; }).join('')}
+      <li class="yv" style="--c:${LCOL.vaka}"><div class="yph"><b>▶</b><span>${LG('Vaka','Case')}</span></div>${c?`<p>${esc(c.brief)}</p><a class="bigbtn" href="#vaka/${c.id}">${LG('Vakayı çöz','Solve the case')}<small>${esc(c.title)}</small></a>`:''}</li></ol>
+    <div class="actions">${nextB2(`data-ynext="${nx.id}"`,nx.n)}</div>`;
+}
+function applyYol(){ if(mode!=='yol') return; const y=YI[yId]; lensCond(y.cond); const a=(y.a[0].find(r=>r.startsWith('a:'))||'').slice(2); partFocus(S[a]?a:null,S[a]&&['kapak','ileti'].includes(S[a].k)); vizShow(null);
+  if(!monitor.classList.contains('show')) requestAnimationFrame(()=>{monitor.classList.add('show'); setTimeout(()=>{sizeCanvas(); insets();},650);});
+  $('lead').textContent=COND[y.cond].lead||'DII'; $('monName').textContent=COND[y.cond].n; }
+function setYol(id){ if(!YI[id]) return; yId=id; markSeen('y',id); if(history.replaceState) history.replaceState(null,'','#yol/'+id); applyYol(); render(); renderNav(); }
+
+function lensNav(){ return mode==='histoloji'?navHisto():mode==='fizyoloji'?navFizyo():mode==='farmakoloji'?navFarma():mode==='mikrobiyoloji'?navMikro():navYol(); }
+function lensCard(){ return mode==='histoloji'?histoHTML():mode==='fizyoloji'?fizyoHTML():mode==='farmakoloji'?farmaHTML():mode==='mikrobiyoloji'?mikroHTML():yolHTML(); }
+function lensClick(e){
+  const g=(a)=>e.target.closest('['+a+']');
+  let b;
+  if((b=g('data-histo'))) { openCard(); setHisto(b.dataset.histo); return true; }
+  if((b=g('data-fizyo'))) { openCard(); setFizyo(b.dataset.fizyo); return true; }
+  if((b=g('data-farma'))) { openCard(); setFarma(b.dataset.farma); return true; }
+  if((b=g('data-mikro'))) { openCard(); setMikro(b.dataset.mikro); return true; }
+  if((b=g('data-yol'))) { openCard(); setYol(b.dataset.yol); return true; }
+  if((b=g('data-hnext'))) { setHisto(b.dataset.hnext); card.scrollTop=0; return true; }
+  if((b=g('data-fnext'))) { setFizyo(b.dataset.fnext); card.scrollTop=0; return true; }
+  if((b=g('data-dnext'))) { setFarma(b.dataset.dnext); card.scrollTop=0; return true; }
+  if((b=g('data-mnext'))) { setMikro(b.dataset.mnext); card.scrollTop=0; return true; }
+  if((b=g('data-ynext'))) { setYol(b.dataset.ynext); card.scrollTop=0; return true; }
+  if(g('data-scope')) { scopeOn=!scopeOn; applyHisto(); render(); return true; }
+  if(g('data-plaque')) { plaque=!plaque; applyHisto(false); render(); return true; }
+  if((b=g('data-fctl'))) { fCtl=b.dataset.fctl; applyFizyo(); render(); return true; }
+  if((b=g('data-dstep'))) { setDStep(+b.dataset.dstep); applyFarmaCtl(); return true; }
+  if((b=g('data-mstep'))) { mStep=+b.dataset.mstep; applyMikro(); render(); return true; }
+  return false;
+}
+function applyFarmaCtl(){ document.querySelectorAll('#vzCtl [data-dstep]').forEach(x=>x.setAttribute('aria-pressed',+x.dataset.dstep===dStep)); }
+card.addEventListener('change',e=>{
+  const d=e.target.closest('[data-duke]'); if(d){ d.checked?duke.add(d.dataset.duke):duke.delete(d.dataset.duke); const st=card.scrollTop; render(); card.scrollTop=st; return; }
+  const j=e.target.closest('[data-jones]'); if(j){ j.checked?jones.add(j.dataset.jones):jones.delete(j.dataset.jones); const st=card.scrollTop; render(); card.scrollTop=st; return; }
+  if(e.target.closest('[data-jgas]')){ jgas=e.target.checked; const st=card.scrollTop; render(); card.scrollTop=st; }
+});
+function enterLens(m,prev){
+  monitor.classList.remove('show','swap'); e12.classList.remove('show');
+  if(m!=='histoloji'){ scope.hidden=true; }
+  if(lastView&&heart){ heart.resetView(); lastView=false; }
+  if(m==='histoloji'){ vizShow(null); applyHisto(); }
+  if(m==='fizyoloji') applyFizyo();
+  if(m==='farmakoloji') applyFarma();
+  if(m==='mikrobiyoloji') applyMikro();
+  if(m==='yol') applyYol();
+  void prev; render(); renderNav();
+}
+
 /* ---------- Ana sayfa ---------- */
 function applyHome3D(){
   if(mode!=='ana') return;
@@ -946,22 +1253,27 @@ function renderHome(){
   const tot=Object.values(quiz.score).reduce((a,s)=>[a[0]+s[0],a[1]+s[1]],[0,0]);
   const doneCases=CASES.filter(c=>vk.best[c.id]&&Object.keys(vk.best[c.id]).length).length;
   const bar=(n,d,txt)=>`<div class="prog"><span>${txt}</span><div class="bar"><i style="width:${d?Math.round(100*n/d):0}%"></i></div></div>`;
-  const cnt=k=>k==='a'?Object.keys(S):k==='d'?Object.keys(COND):LESSONS.map(l=>l.id);
+  const cnt=k=>k==='a'?Object.keys(S):k==='d'?VISC():LESSONS.map(l=>l.id);
   const sn=k=>cnt(k).filter(id=>isSeen(k,id)).length;
+  const nL=(k,ids)=>ids.filter(id=>isSeen(k,id)).length;
+  const hs=ORG.HISTO.map(x=>x.id), fs=ORG.FIZYO.map(x=>x.id), ds=ORG.FARMA.map(x=>x.id), ms=ORG.MIKRO.map(x=>x.id);
   const tiles=[
-    ['anatomi','Anatomi',`${Object.keys(S).length} yapı: odacıklar, koronerler, ileti sistemi, sinirler`,bar(sn('a'),Object.keys(S).length,`${sn('a')}/${Object.keys(S).length} incelendi`)],
-    ['durumlar','Durumlar',`${Object.keys(COND).length} ritim ve klinik tablo, canlı EKG ile`,bar(sn('d'),Object.keys(COND).length,`${sn('d')}/${Object.keys(COND).length} çalışıldı`)],
-    ['ogren','EKG dersleri',`${LESSONS.length} ders ve 12 derivasyonlu canlı EKG`,bar(sn('l'),LESSONS.length,`${sn('l')}/${LESSONS.length} tamamlandı`)],
-    ['vaka','Vakalar',`${CASES.length} hasta ve kendi senaryon: tanı koy, tedaviyi seç`,bar(doneCases,CASES.length,`${doneCases}/${CASES.length} vaka bitti`)],
-    ['sina','Sına','EKG’den tanı, kalpte bul, çoktan seçmeli',bar(tot[0],tot[1],tot[1]?`%${Math.round(100*tot[0]/tot[1])} doğru (${tot[1]} soru)`:'Henüz soru çözülmedi')]];
+    ['anatomi',LG('Anatomi ve histoloji','Anatomy and histology'),LG(`${Object.keys(S).length} yapı ve ${hs.length} doku: 3D’den mikroskoba`,`${Object.keys(S).length} structures and ${hs.length} tissues: from 3D to the microscope`),bar(sn('a')+nL('h',hs),Object.keys(S).length+hs.length,`${sn('a')+nL('h',hs)}/${Object.keys(S).length+hs.length} incelendi`),1],
+    ['fizyoloji',LG('Fizyoloji','Physiology'),LG(`${fs.length} konu (AP, Wiggers, basınç–hacim) ve ${LESSONS.length} EKG dersi`,`${fs.length} topics (AP, Wiggers, pressure–volume) and ${LESSONS.length} ECG lessons`),bar(nL('f',fs)+sn('l'),fs.length+LESSONS.length,`${nL('f',fs)+sn('l')}/${fs.length+LESSONS.length} tamamlandı`),2],
+    ['durumlar',LG('Fizyopatoloji','Pathophysiology'),LG(`${VISC().length} durum: neden, mekanizma, bulgu, EKG ve lab`,`${VISC().length} conditions: cause, mechanism, findings, ECG and labs`),bar(sn('d'),VISC().length,`${sn('d')}/${VISC().length} çalışıldı`),3],
+    ['farmakoloji',LG('Farmakoloji','Pharmacology'),LG(`${ds.length} ilaç grubu, hücre düzeyinde animasyonla`,`${ds.length} drug classes, animated at cell level`),bar(nL('r',ds),ds.length,`${nL('r',ds)}/${ds.length} çalışıldı`),4],
+    ['mikrobiyoloji',LG('Mikrobiyoloji','Microbiology'),LG('Endokardit, miyokardit, romatizmal ateş, perikardit','Endocarditis, myocarditis, rheumatic fever, pericarditis'),bar(nL('m',ms),ms.length,`${nL('m',ms)}/${ms.length} çalışıldı`),5],
+    ['vaka','Vakalar',`${CASES.length} hasta ve kendi senaryon: tanı koy, tedaviyi seç`,bar(doneCases,CASES.length,`${doneCases}/${CASES.length} vaka bitti`),0],
+    ['sina','Sına','EKG’den tanı, kalpte bul, çoktan seçmeli',bar(tot[0],tot[1],tot[1]?`%${Math.round(100*tot[0]/tot[1])} doğru (${tot[1]} soru)`:'Henüz soru çözülmedi'),0]];
   let last='#anatomi'; try{ last=localStorage.getItem('kalp.last')||last; }catch(e){}
-  const lastM=last.replace('#','').split('/')[0], lastN={anatomi:'Anatomi',durumlar:'Durumlar',ogren:'EKG dersleri',vaka:'Vakalar',sina:'Sına'}[lastM]||'Anatomi';
-  const started=sn('a')+sn('d')+sn('l')+tot[1]+doneCases>0;
-  el.innerHTML=`<div class="hhero"><div class="eyebrow">Tıp öğrencileri için 3D kalp atlası</div><h1>Kalbi katman katman öğren</h1>
-    <p>Gerçek bir insan kalbi modelinde anatomiyi incele, ritim bozukluklarını EKG ile izle, hasta vakalarını yönet.</p>
+  const lastM=last.replace('#','').split('/')[0], lastN={anatomi:'Anatomi',histoloji:'Histoloji',fizyoloji:'Fizyoloji',durumlar:'Fizyopatoloji',farmakoloji:'Farmakoloji',mikrobiyoloji:'Mikrobiyoloji',yol:'Hastalık yolu',ogren:'EKG dersleri',vaka:'Vakalar',sina:'Sına'}[lastM]||'Anatomi';
+  const started=sn('a')+sn('d')+sn('l')+nL('h',hs)+nL('f',fs)+nL('r',ds)+nL('m',ms)+tot[1]+doneCases>0;
+  el.innerHTML=`<div class="hhero"><div class="eyebrow">${LG('Tıp öğrencileri için 3D kalp atlası','A 3D heart atlas for medical students')}</div><h1>${LG('Kalbi beş mercekte öğren','Learn the heart through five lenses')}</h1>
+    <p>${LG('Ders kitabının sırasıyla: yapı, normal işleyiş, bozulma, ilaç ve etken. Her hastalık bir hasta vakasıyla biter.','In textbook order: structure, normal function, what goes wrong, drugs and organisms. Every disease ends with a patient case.')}</p>
+    <a class="lnk hpath" href="#yol/${yId}">${LG('Bir hastalığı baştan sona izle: 5 katman + vaka','Follow one disease end to end: 5 layers + a case')} →</a>
     <div class="streak">${FLAME}<span><b>${streak}</b> gün üst üste</span></div>
     <a class="bigbtn" href="${esc(started?last:'#anatomi')}">${started?`Kaldığın yerden devam et<small>${esc(lastN)}</small>`:'Anatomiden başla'}</a></div>
-    <nav class="htiles" aria-label="Bölümler">${tiles.map(([k,t,d,b])=>`<a class="htile" href="#${k}"><i aria-hidden="true">${icon(k)}</i><b>${esc(t)}</b><span>${esc(d)}</span>${b}</a>`).join('')}</nav>`;
+    <nav class="htiles" aria-label="Bölümler">${tiles.map(([k,t,d,b,n])=>`<a class="htile${n?'':' alt'}" href="#${k}"><i aria-hidden="true">${icon(k)}</i>${n?`<em class="hn">${n}</em>`:''}<b>${esc(t)}</b><span>${esc(d)}</span>${b}</a>`).join('')}</nav>`;
 }
 
 /* ---------- Tema: açık / koyu, dairesel geçişle ---------- */
@@ -1071,11 +1383,16 @@ function loop(ts){
     if(ts-hrTick>500){hrTick=ts; const hr=sim.heartRate(), v=COND[quiz.cur.key].r.vent; $('hrv').textContent= v==='vf'?'—':hr==null?'--':hr;}
   }
   if(mode==='ana') sim.step(dt);
+  const lensLive=mode==='fizyoloji'||mode==='farmakoloji'||mode==='mikrobiyoloji'||mode==='yol';
+  if(lensLive){ sim.step(dt); const m=sim.mechanics(); if(bA) bA.style.background=m.af?mix(OFF,AF,m.fib):mix(OFF,RED,m.ca); if(bV) bV.style.background=mix(OFF,RED,m.cv); }
+  if(mode==='fizyoloji') phys.frame(reduce?0:dt);
+  if(mode==='farmakoloji'&&!vzEcgBox.hidden){ drawMini(); if(ts-hrTick>500){ hrTick=ts; const hr=sim.heartRate(); $('vzEcgHr').textContent=hr==null?'':hr+LG(' /dk',' /min'); $('vzEcgLbl').textContent=COND[sim.key].n; } }
+  if(mode==='yol'){ if(cv.width<10) sizeCanvas(); drawECG(); if(ts-hrTick>500){hrTick=ts; const hr=sim.heartRate(); $('hrv').textContent=hr==null?'--':hr;} }
   if(mode==='ogren'){
     sim.step(dt); if(c12.width<10) size12(); draw12();
     heart&&heart.setVector(vecAt(sim.t));
   }
-  heart&&heart.frame(mode==='ana'||mode==='durumlar'||mode==='ogren'||mode==='vaka'||(mode==='sina'&&quiz.cur&&quiz.cur.t==='ecg'&&quiz.cur.done)?sim:null);
+  heart&&heart.frame(lensLive||mode==='ana'||mode==='durumlar'||mode==='ogren'||mode==='vaka'||(mode==='sina'&&quiz.cur&&quiz.cur.t==='ecg'&&quiz.cur.done)?sim:null);
   drawLabels();
 }
 window.__kalp={sim,get heart(){return heart;},get vk(){return vk;}};

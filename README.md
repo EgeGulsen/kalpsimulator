@@ -32,6 +32,12 @@ bir yerel sunucu kullanın. Node kurmak istemezseniz Python da yeter: `python3 -
 
 Doğrudan bir bölüme bağlantı verilebilir: `#durumlar/af`, `#durumlar/stemi_ant`, `#ogren/avr`, `#ogren/rprog`, `#ogren/sss` …
 
+## Beş mercek
+
+Kalp ders kitabı sırasıyla beş mercekte öğretilir: **Anatomi + Histoloji → Fizyoloji → Fizyopatoloji →
+Farmakoloji → Mikrobiyoloji**. Her hastalık bir **hastalık yolunda** (`#yol/<id>`) bu beş katmanda gezilir ve
+bir vakayla biter. Ayrıntı ve yeni organ ekleme sırası: [docs/ORGAN-SABLONU.md](docs/ORGAN-SABLONU.md).
+
 ## Sına (kendini sınama)
 
 `#sina` bölümünde üç soru türü var; **Karışık** üçünden rastgele seçer:
@@ -98,6 +104,13 @@ js/ecg12.js             12 derivasyon modeli: derivasyon yönleri, kalp vektör�
 js/sim.js               Ritim zamanlayıcısı, sentetik EKG (DII/DIII/V1/V2), ileti zamanlamaları
 js/heart3d.js           GLB modeli yükler; uyarı dalgası, kasılma, ileti sistemi, duruma özel efektler,
                         gövde ve tedavi animasyonları
+js/scenarios2.js        Aşama 1 durumları (kalp yetmezliği, kapaklar, kardiyomiyopatiler, endokardit, miyokardit,
+                        romatizmal ateş), tüm durumlara bulgu/lab ve hasta oluşturucu tedavileri
+js/cases3.js            Hastalık yollarını bitiren vakalar (endokardit, ARF, miyokardit, KY, aort darlığı)
+js/organ-kalp.js        Kalbin beş mercekli organ kaydı (histoloji, fizyoloji, farmakoloji, mikrobiyoloji, yollar)
+js/viz.js               Mercek görselleri: mikroskop, fizyoloji grafikleri, ilaç ve patogenez sahneleri
+js/i18n.js, js/en-*.js  İngilizce dil desteği ve çeviri paketleri
+docs/ORGAN-SABLONU.md   Yeni bir organı beş mercekle eklemek için şablon
 js/app.js               Arayüz, mod geçişi (#anatomi / #durumlar / #ogren / #sina), EKG ve 12 derivasyon çizimi
 assets/heart.glb        Kalp modeli (19 parça: odacıklar, septumlar, kapaklar, koronerler, büyük damarlar)
 assets/heart.landmarks.json  Modelden çıkarılan referans noktaları (tepe, taban, kapak merkezleri…)
@@ -117,7 +130,7 @@ Tıklanan noktanın adı bu tablodan gelir. Sınırlar yaklaşıktır; yeni bir 
 ## Yeni senaryo eklemek
 
 `js/scenarios.js` içindeki `COND` nesnesine bir girdi ekleyin. Metin alanları: `n`, `tag`, `sum`, `why[]`,
-`how`, `ecg[]`, `mus`, `ner`, `cli`, `note`, `read{}`, `lead`. Davranış:
+`how`, `bul[]` (bulgular), `ecg[]`, `lab[]` (laboratuvar/görüntüleme), `mus`, `ner`, `cli`, `note`, `read{}`, `lead`. Davranış:
 
 - `r` (ritim): `atrial: 'sinus'|'af'|'flutter'|'retro'|'none'`, `rate`, `pr`, `av: 'wenck'|'mobitz2'|'complete'`,
   `vent: 'af'|'flutter'|'escape'|'vt'|'torsades'|'vf'|'none'|'svt'|'paced'`, `ventRate`,
@@ -125,7 +138,8 @@ Tıklanan noktanın adı bu tablodan gelir. Sınırlar yaklaşıktır; yeni bir 
   `normal|rbbb|lbbb|wpw|vt|paced|slow`), `pvc:'bigeminy'`, `volt`, `alternans`, `pAmp`, `prDep`
 - `off`: çalışmayan ileti yapıları (koyu sarı), `nerveOn`: baskın otonom sinir
 - `fx` (3D efekt): `af`, `flutter`, `svt`, `block`, `blockFlash`, `ap`, `focus`, `scar`, `chaos`, `dead`,
-  `lead`, `infarct: 'lad'|'rca'`, `sac: 'fluid'|'inflamed'`, `swing`, `rvDilate`, `clot`
+  `lead`, `infarct: 'lad'|'rca'`, `sac: 'fluid'|'inflamed'`, `swing`, `rvDilate`, `clot`,
+  `veg: 'mit'|'aov'|'tri'` (vejetasyon), `lvDilate`
 
 ## Modeli yeniden üretmek
 
