@@ -956,7 +956,7 @@ function rxApply(i){
   } else { if(r.next) switchCond(r.next); fin(); render(); }
 }
 
-/* ---------- Beş mercek: Anatomi + Histoloji → Fizyoloji → Fizyopatoloji → Farmakoloji → Mikrobiyoloji ----------
+/* ---------- Beş mercek: Anatomi + Histoloji → Fizyoloji → Mikrobiyoloji → Fizyopatoloji → Farmakoloji ----------
    İçerik window.KALP.ORGANS.kalp (organ-kalp.js) içinden okunur; başka bir organ aynı yapıyla eklenebilir. */
 const ORG=window.KALP.ORGANS.kalp, VZ=window.KalpViz;
 const LENS_OF={anatomi:'anatomi',histoloji:'anatomi',fizyoloji:'fizyoloji',ogren:'fizyoloji',durumlar:'fizyopatoloji',yol:'fizyopatoloji',farmakoloji:'farmakoloji',mikrobiyoloji:'mikrobiyoloji'};
@@ -986,7 +986,7 @@ function refInfo(ref){
   return null;
 }
 const lchip=ref=>{ const r=refInfo(ref); return r?`<a class="lchip" href="${r.h}"><i style="background:${LCOL[r.L]}"></i>${r.sub?`<small>${esc(r.sub)}</small>`:''}${esc(r.n)}</a>`:''; };
-const YL=['a','f','p','d','m'], YLK={a:'anatomi',f:'fizyoloji',p:'fizyopatoloji',d:'farmakoloji',m:'mikrobiyoloji'};
+const YL=['a','f','m','p','d'], YLK={a:'anatomi',f:'fizyoloji',p:'fizyopatoloji',d:'farmakoloji',m:'mikrobiyoloji'};
 const yollarFor=ref=>ORG.YOLLAR.filter(y=>YL.some(L=>y[L][0].includes(ref))||('v:'+y.vaka)===ref);
 /* Bir konunun kartında: bu konu hangi hastalık yolunda, beş katman şeridi */
 function stripHTML(ref,lensK){
@@ -1260,9 +1260,9 @@ function renderHome(){
   const tiles=[
     ['anatomi',LG('Anatomi ve histoloji','Anatomy and histology'),LG(`${Object.keys(S).length} yapı ve ${hs.length} doku: 3D’den mikroskoba`,`${Object.keys(S).length} structures and ${hs.length} tissues: from 3D to the microscope`),bar(sn('a')+nL('h',hs),Object.keys(S).length+hs.length,`${sn('a')+nL('h',hs)}/${Object.keys(S).length+hs.length} incelendi`),1],
     ['fizyoloji',LG('Fizyoloji','Physiology'),LG(`${fs.length} konu (AP, Wiggers, basınç–hacim) ve ${LESSONS.length} EKG dersi`,`${fs.length} topics (AP, Wiggers, pressure–volume) and ${LESSONS.length} ECG lessons`),bar(nL('f',fs)+sn('l'),fs.length+LESSONS.length,`${nL('f',fs)+sn('l')}/${fs.length+LESSONS.length} tamamlandı`),2],
-    ['durumlar',LG('Fizyopatoloji','Pathophysiology'),LG(`${VISC().length} durum: neden, mekanizma, bulgu, EKG ve lab`,`${VISC().length} conditions: cause, mechanism, findings, ECG and labs`),bar(sn('d'),VISC().length,`${sn('d')}/${VISC().length} çalışıldı`),3],
-    ['farmakoloji',LG('Farmakoloji','Pharmacology'),LG(`${ds.length} ilaç grubu, hücre düzeyinde animasyonla`,`${ds.length} drug classes, animated at cell level`),bar(nL('r',ds),ds.length,`${nL('r',ds)}/${ds.length} çalışıldı`),4],
-    ['mikrobiyoloji',LG('Mikrobiyoloji','Microbiology'),LG('Endokardit, miyokardit, romatizmal ateş, perikardit','Endocarditis, myocarditis, rheumatic fever, pericarditis'),bar(nL('m',ms),ms.length,`${nL('m',ms)}/${ms.length} çalışıldı`),5],
+    ['mikrobiyoloji',LG('Mikrobiyoloji','Microbiology'),LG('Endokardit, miyokardit, romatizmal ateş, perikardit','Endocarditis, myocarditis, rheumatic fever, pericarditis'),bar(nL('m',ms),ms.length,`${nL('m',ms)}/${ms.length} çalışıldı`),3],
+    ['durumlar',LG('Fizyopatoloji','Pathophysiology'),LG(`${VISC().length} durum: neden, mekanizma, bulgu, EKG ve lab`,`${VISC().length} conditions: cause, mechanism, findings, ECG and labs`),bar(sn('d'),VISC().length,`${sn('d')}/${VISC().length} çalışıldı`),4],
+    ['farmakoloji',LG('Farmakoloji','Pharmacology'),LG(`${ds.length} ilaç grubu, hücre düzeyinde animasyonla`,`${ds.length} drug classes, animated at cell level`),bar(nL('r',ds),ds.length,`${nL('r',ds)}/${ds.length} çalışıldı`),5],
     ['vaka','Vakalar',`${CASES.length} hasta ve kendi senaryon: tanı koy, tedaviyi seç`,bar(doneCases,CASES.length,`${doneCases}/${CASES.length} vaka bitti`),0],
     ['sina','Sına','EKG’den tanı, kalpte bul, çoktan seçmeli',bar(tot[0],tot[1],tot[1]?`%${Math.round(100*tot[0]/tot[1])} doğru (${tot[1]} soru)`:'Henüz soru çözülmedi'),0]];
   let last='#anatomi'; try{ last=localStorage.getItem('kalp.last')||last; }catch(e){}

@@ -1,5 +1,5 @@
 /* Kalp Simülatörü: KALP ORGAN ŞABLONU (Aşama 1).
-   Her organ aynı beş mercekle öğretilir: Anatomi + Histoloji → Fizyoloji → Fizyopatoloji → Farmakoloji → Mikrobiyoloji.
+   Her organ aynı beş mercekle öğretilir: Anatomi + Histoloji → Fizyoloji → Mikrobiyoloji → Fizyopatoloji → Farmakoloji.
    Bu dosya kalbin organ kaydıdır: window.KALP.ORGANS.kalp. Yeni bir organ eklemek için aynı yapıda bir kayıt yazılır
    (ayrıntılı açıklama: docs/ORGAN-SABLONU.md). Arayüz (app.js) yalnız bu yapıyı okur.
 
@@ -13,9 +13,9 @@
 const LENSES=[
   {k:'anatomi',n:'Anatomi ve histoloji',s:'Anatomi',d:'Yapı: 3D model, katmanlar, doku ve hücre.'},
   {k:'fizyoloji',n:'Fizyoloji',s:'Fizyoloji',d:'Normal işleyiş: akım, basınç, sinyal.'},
+  {k:'mikrobiyoloji',n:'Mikrobiyoloji',s:'Mikrobiyoloji',d:'Etken, patogenez, tanı ve tedavi.'},
   {k:'fizyopatoloji',n:'Fizyopatoloji',s:'Fizyopatoloji',d:'Bozulma: neden, mekanizma, bulgu, EKG ve laboratuvar.'},
-  {k:'farmakoloji',n:'Farmakoloji',s:'Farmakoloji',d:'İlaç nereye bağlanır, hücrede ve kalpte ne değişir.'},
-  {k:'mikrobiyoloji',n:'Mikrobiyoloji',s:'Mikrobiyoloji',d:'Etken, patogenez, tanı ve tedavi.'}
+  {k:'farmakoloji',n:'Farmakoloji',s:'Farmakoloji',d:'İlaç nereye bağlanır, hücrede ve kalpte ne değişir.'}
 ];
 
 /* ---------------- 1.2 HİSTOLOJİ ----------------

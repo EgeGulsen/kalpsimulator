@@ -5,9 +5,9 @@
 const LENSES=[
   {k:'anatomi',n:'Anatomy and histology',s:'Anatomy',d:'Structure: 3D model, layers, tissue and cell.'},
   {k:'fizyoloji',n:'Physiology',s:'Physiology',d:'Normal function: flow, pressure, signalling.'},
+  {k:'mikrobiyoloji',n:'Microbiology',s:'Microbiology',d:'Organism, pathogenesis, diagnosis and treatment.'},
   {k:'fizyopatoloji',n:'Pathophysiology',s:'Pathophysiology',d:'What goes wrong: cause, mechanism, findings, ECG and labs.'},
-  {k:'farmakoloji',n:'Pharmacology',s:'Pharmacology',d:'Where a drug binds and what changes in the cell and the heart.'},
-  {k:'mikrobiyoloji',n:'Microbiology',s:'Microbiology',d:'Organism, pathogenesis, diagnosis and treatment.'}
+  {k:'farmakoloji',n:'Pharmacology',s:'Pharmacology',d:'Where a drug binds and what changes in the cell and the heart.'}
 ];
 
 const HISTO=[
