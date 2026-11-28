@@ -5,7 +5,7 @@
 const t=s=>window.KalpI18n?window.KalpI18n.t(s):s;
 const UI={
 'Mercek görseli':'Lens visual',
-'Kalbe yakınlaş ve kalp atlasını aç':'Zoom into the heart and open the heart atlas','Kalp':'Heart','Aktif · incele':'Active · explore','Vücut haritası':'Body map','Kalp · aktif':'Heart · active','Diğer organlar · yakında':'Other organs · coming soon',
+'Kalbe yakınlaş ve kalp atlasını aç':'Zoom into the heart and open the heart atlas','Kalp':'Heart','Aktif · incele':'Active · explore','Vücut haritası':'Body map','Kalp · aktif':'Heart · active','Diğer organlar · yakında':'Other organs · coming soon','Tekerlek: imlecin olduğu yere yakınlaş · Sürükle: döndür · Sağ tık: kaydır · Organa tıkla: odaklan':'Wheel: zoom to the cursor · Drag: rotate · Right-click: pan · Click an organ: focus','Yakınlaştırma':'Zoom','Yakınlaştır':'Zoom in','Uzaklaştır':'Zoom out','Tüm vücudu göster':'Show the whole body','Tüm vücut':'Whole body',
 'Ara':'Search','Ara (Ctrl+K)':'Search (Ctrl+K)','Ara (Ctrl+K ya da /)':'Search (Ctrl+K or /)','Sonuçlar':'Results',
 'Ara: yapı, hastalık, ilaç, etken, vaka…':'Search: structure, disease, drug, organism, case…',
 'Fizyoloji':'Physiology','Fizyopatoloji':'Pathophysiology','Farmakoloji':'Pharmacology','Mikrobiyoloji':'Microbiology','Histoloji':'Histology',

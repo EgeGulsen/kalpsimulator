@@ -1258,9 +1258,12 @@ function bodyHover(id,x,y){
 function bodyPick(id){
   if(mode!=='ana') return;
   if(id==='kalp'){ zoomToHeart(); return; }
-  if(id){ const r=stage.getBoundingClientRect(); bodyTipPin=Date.now()+1800; bodyHover(id,lastPtr.x||r.left+r.width/2,lastPtr.y||r.top+r.height/2); bodyTipPin=Date.now()+1800; setTimeout(()=>{ if(Date.now()>=bodyTipPin) btip.hidden=true; },1850); }
+  if(id){ heart.focusOrgan(id); const r=stage.getBoundingClientRect(); bodyTipPin=Date.now()+1800; bodyHover(id,lastPtr.x||r.left+r.width/2,lastPtr.y||r.top+r.height/2); bodyTipPin=Date.now()+1800; setTimeout(()=>{ if(Date.now()>=bodyTipPin) btip.hidden=true; },1850); }
 }
 $('btnHeartZoom').addEventListener('click',zoomToHeart);
+$('bzIn').addEventListener('click',()=>heart&&heart.bodyStep2(0.6));
+$('bzOut').addEventListener('click',()=>heart&&heart.bodyStep2(1.6));
+$('bzAll').addEventListener('click',()=>heart&&heart.bodyView());
 const lastPtr={x:0,y:0}; stage.addEventListener('pointerdown',e=>{lastPtr.x=e.clientX; lastPtr.y=e.clientY;});
 function zoomToHeart(){
   if(!heart||!heart.isBody||!heart.isBody()||document.body.classList.contains('bzoom')) return;
