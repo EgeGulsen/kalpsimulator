@@ -43,7 +43,7 @@ function create(el,opts){
   renderer.toneMapping=T.ACESFilmicToneMapping; renderer.toneMappingExposure=0.95;
   el.appendChild(renderer.domElement);
   const scene=new T.Scene();
-  const camera=new T.PerspectiveCamera(30,1,0.1,100);
+  const camera=new T.PerspectiveCamera(30,1,0.1,400);
   const HOME={pos:V(1.6,1.0,10.8),target:V(0.05,0.3,0)};
   camera.position.copy(HOME.pos);
   const controls=new T.OrbitControls(camera,renderer.domElement);
@@ -89,14 +89,16 @@ function create(el,opts){
   let down=null, hoverReq=null, pin=null;
   renderer.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY};});
   renderer.domElement.addEventListener('pointerup',e=>{
-    if(down&&Math.hypot(e.clientX-down.x,e.clientY-down.y)<6){ const pk=pickAt(e.clientX,e.clientY); pin=pk; opts.onPick&&opts.onPick(pk?pk.id:null); }
+    if(down&&Math.hypot(e.clientX-down.x,e.clientY-down.y)<6){
+      if(BOD.on){ if(!BOD.zoom) opts.onBodyPick&&opts.onBodyPick(bodyPick(e.clientX,e.clientY),e.clientX,e.clientY); down=null; return; }
+      const pk=pickAt(e.clientX,e.clientY); pin=pk; opts.onPick&&opts.onPick(pk?pk.id:null); }
     down=null;
   });
   renderer.domElement.addEventListener('pointermove',e=>{
     if(e.pointerType==='touch'||e.buttons){opts.onHover&&opts.onHover(null); return;}
     hoverReq={x:e.clientX,y:e.clientY};
   });
-  renderer.domElement.addEventListener('pointerleave',()=>{hoverReq=null; opts.onHover&&opts.onHover(null);});
+  renderer.domElement.addEventListener('pointerleave',()=>{hoverReq=null; opts.onHover&&opts.onHover(null); if(BOD.on){ BOD.hover=null; opts.onBodyHover&&opts.onBodyHover(null); }});
 
   const inset={t:0,l:0,r:0,b:0};
   function resize(){
@@ -847,7 +849,8 @@ function create(el,opts){
 
   function frame(sim){
     controls.update();
-    if(hoverReq&&opts.onHover){const h=hoverReq; hoverReq=null; const pk=pickAt(h.x,h.y); opts.onHover(pk?pk.id:null,h.x,h.y);}
+    if(hoverReq&&BOD.on){const h=hoverReq; hoverReq=null; const id=BOD.zoom?null:bodyPick(h.x,h.y); BOD.hover=id; renderer.domElement.style.cursor=id==='kalp'?'pointer':''; opts.onBodyHover&&opts.onBodyHover(id,h.x,h.y);}
+    else if(hoverReq&&opts.onHover){const h=hoverReq; hoverReq=null; const pk=pickAt(h.x,h.y); opts.onHover(pk?pk.id:null,h.x,h.y);}
     if(!R){renderer.render(scene,camera); return;}
     const live=state.mode==='durumlar'&&sim;
     const F=R.FX, fx=state.fx;
@@ -892,7 +895,7 @@ function create(el,opts){
       resetPaint();
       R.condItems.forEach(ci=>ci.pulse.visible=false);
     }
-    glowFrame(performance.now()/1000); camStep(); txStep();
+    glowFrame(performance.now()/1000); camStep(); txStep(); bodyStep();
     renderer.render(scene,camera);
   }
 
@@ -955,19 +958,21 @@ function create(el,opts){
     o=o||{};
     return new T.ShaderMaterial({transparent:true,depthWrite:false,side:o.side===undefined?T.DoubleSide:o.side,
       uniforms:{uC:{value:new T.Color(col)},uR:{value:new T.Color(o.rim||0xffffff)},uA:{value:1},uA0:{value:a0},uA1:{value:a1},uY0:{value:o.y0===undefined?-99:o.y0},uY1:{value:o.y1===undefined?99:o.y1},
-        uN1:{value:o.n1||V(0,-99,0)},uN2:{value:o.n2||V(0,-99,0)},uNC:{value:new T.Color(0xa8645a)}},
+        uN1:{value:o.n1||V(0,-99,0)},uN2:{value:o.n2||V(0,-99,0)},uNC:{value:new T.Color(0xa8645a)},uH:{value:o.hole||new T.Vector4(0,0,0,0)}},
       vertexShader:'varying vec3 vN;varying vec3 vV;varying vec3 vP;void main(){vec4 mv=modelViewMatrix*vec4(position,1.);vN=normalize(normalMatrix*normal);vV=-mv.xyz;vP=position;gl_Position=projectionMatrix*mv;}',
-      fragmentShader:'uniform vec3 uC;uniform vec3 uR;uniform vec3 uNC;uniform vec3 uN1;uniform vec3 uN2;uniform float uA;uniform float uA0;uniform float uA1;uniform float uY0;uniform float uY1;varying vec3 vN;varying vec3 vV;varying vec3 vP;'+
+      fragmentShader:'uniform vec4 uH;uniform vec3 uC;uniform vec3 uR;uniform vec3 uNC;uniform vec3 uN1;uniform vec3 uN2;uniform float uA;uniform float uA0;uniform float uA1;uniform float uY0;uniform float uY1;varying vec3 vN;varying vec3 vV;varying vec3 vP;'+
         'void main(){vec3 n=normalize(vN);if(!gl_FrontFacing)n=-n;vec3 v=normalize(vV);float f=pow(1.-abs(dot(n,v)),2.2);'+
         'float dif=0.62+0.38*max(dot(n,normalize(vec3(-0.35,0.65,0.68))),0.);'+
         'float fade=smoothstep(uY0,uY0+1.2,vP.y)*(1.-smoothstep(uY1-1.0,uY1,vP.y));'+
         'float nip=max(1.-smoothstep(0.16,0.3,distance(vP,uN1)),1.-smoothstep(0.16,0.3,distance(vP,uN2)));'+
         'vec3 c=mix(uC*dif,uR,f*0.55);c=mix(c,uNC,nip*0.6);'+
-        'gl_FragColor=vec4(c,(uA0+uA1*f+0.1*nip)*fade*uA);}'});
+        'float hole=uH.w>0.?smoothstep(uH.w,uH.w+0.9,distance(vP,uH.xyz)):1.;'+
+        'gl_FragColor=vec4(c,(uA0+uA1*f+0.1*nip)*fade*uA*hole);}'});
   }
   const torsoG=new T.Group(); torsoG.visible=false; BODY.add(torsoG);
   (function buildTorso(){
     const add=(geo,mat,ro)=>{ const m=new T.Mesh(geo,mat); m.renderOrder=ro; torsoG.add(m); return m; };
+    const SIL=torsoG.userData.sil={lung:[],air:[],liver:null}; // tüm vücut görünümü bu geometrileri siluet olarak yeniden kullanır
     // ---- deri
     const NY=96, NA=80, y0=-5.8, y1=5.9, pos=[], idx=[];
     for(let j=0;j<=NY;j++){ const y=y0+(y1-y0)*j/NY; for(let i=0;i<=NA;i++){ const p=skinPt(y,-Math.PI+2*Math.PI*i/NA); pos.push(p.x,p.y,p.z); } }
@@ -1031,8 +1036,9 @@ function create(el,opts){
     // ---- trakea ve ana bronşlar
     const air=ghost(0xd6e5ea,0.06,0.42,{rim:0xf4fbff});
     const tr=add(new T.TubeGeometry(new T.CatmullRomCurve3([V(TOR.cx,5.9,-0.35),V(TOR.cx,4.3,-0.42),V(TOR.cx,3.0,-0.7),V(TOR.cx+0.04,1.85,-0.98)]),40,0.3,12,false),air,17);
-    tube([V(TOR.cx+0.04,1.95,-0.98),V(TOR.cx-0.55,1.6,-1.0),V(TOR.cx-1.1,1.25,-1.05)],0.2,air,16).renderOrder=17;
-    tube([V(TOR.cx+0.04,1.95,-0.98),V(TOR.cx+0.75,1.6,-1.1),V(TOR.cx+1.45,1.12,-1.15)],0.19,air,16).renderOrder=17;
+    const b1=tube([V(TOR.cx+0.04,1.95,-0.98),V(TOR.cx-0.55,1.6,-1.0),V(TOR.cx-1.1,1.25,-1.05)],0.2,air,16); b1.renderOrder=17;
+    const b2=tube([V(TOR.cx+0.04,1.95,-0.98),V(TOR.cx+0.75,1.6,-1.1),V(TOR.cx+1.45,1.12,-1.15)],0.19,air,16); b2.renderOrder=17;
+    SIL.air.push(tr.geometry,b1.geometry,b2.geometry);
     // ---- akciğerler: kafesin içini doldurur, kalbe ve mediastene yer bırakır (kardiyak çentik)
     const HE={c:V(0.17,-0.12,0.2),r:V(1.6,1.52,1.5)}, GV={c:V(-0.25,1.75,-0.35),r:V(1.1,1.25,1.15)};
     const latPush=(p,E,s)=>{ const dy=(p.y-E.c.y)/E.r.y, dz=(p.z-E.c.z)/E.r.z, dx=(p.x-E.c.x)/E.r.x; if(dx*dx+dy*dy+dz*dz<1){ const h=Math.sqrt(Math.max(0,1-dy*dy-dz*dz)); const xb=E.c.x+s*E.r.x*h; if(s*(p.x-xb)<0) p.x=xb; } };
@@ -1049,7 +1055,7 @@ function create(el,opts){
         clampIn(CAGE,p,0.94);
         pa.setXYZ(i,p.x,p.y,p.z);
       }
-      geo.computeVertexNormals(); add(geo,lungM,17);
+      geo.computeVertexNormals(); add(geo,lungM,17); SIL.lung.push(geo);
     }
     // ---- diyafram ve karaciğer
     const NR=22, NT=72, dp=[], di=[];
@@ -1064,10 +1070,132 @@ function create(el,opts){
       const dd=dia(q.x,q.z)-0.06; if(q.y>dd) q.y=dd; if(q.y<-4.1) q.y=-4.1+(q.y+4.1)*0.2;
       clampIn(CAGE,q,0.95); la.setXYZ(i,q.x,q.y,q.z);
     }
-    lg.computeVertexNormals(); add(lg,ghost(0x9c4a3a,0.04,0.3,{rim:0xe6a08c}),15);
+    lg.computeVertexNormals(); add(lg,ghost(0x9c4a3a,0.04,0.3,{rim:0xe6a08c}),15); SIL.liver=lg;
   })();
   const TORSO_VIEW={pos:V(TOR.cx+1.4,1.2,27.5),target:V(TOR.cx+0.15,-0.55,0)};
   let camAnim=null;
+
+  /* =====================================================================
+     Tüm vücut (giriş ekranı): saydam deri, organlar siluet, kalp tam ve atıyor.
+     Deri tek katman görünür: önce yalnız derinlik yazılır, sonra yalnız en öndeki
+     yüzey boyanır; böylece kol, bacak ve gövdenin birleştiği yerler tek kabuk gibi durur.
+     Boy ≈ 38 birim (1 birim ≈ 4,5 cm): baş tepesi ≈ +10, ayak tabanı ≈ −28.
+     ===================================================================== */
+  const bodyG=new T.Group(); bodyG.visible=false; BODY.add(bodyG);
+  const BOD={on:false,fade:1,sway:0,organs:[],hit:null,skinMats:[],silMats:[],dark:false,zoom:null,t0:performance.now()};
+  const BSK=[[-10.7,1.1,0.9,2.2,0.2],[-10.2,2.7,1.85,2.4,0.25],[-9.3,3.6,2.25,2.5,0.25],[-8.0,3.78,2.28,2.4,0.2],[-6.8,3.5,2.2,2.3,0.15]].concat(SKIN.slice(0,-1),[[5.2,1.36,1.42,2.0,-0.55],[6.7,1.3,1.38,2.0,-0.5]]);
+  function bodyPt(y,a){
+    const [rx,rz,e,dz]=profAt(BSK,y), p=shell(BSK,y,a,1), cx=TOR.cx, cz=TOR.cz+dz;
+    const ux=(p.x-cx)/rx, uz=(p.z-cz)/rz, n=V(p.x-cx,0,p.z-cz).normalize();
+    return p.addScaledVector(n,y>-6.5?skinDisp(y,ux,uz):0);
+  }
+  // değişken kesitli boru: rk = [[t, genişlik, derinlik], ...]; ref: kesitin "derinlik" eksenine yakın yön
+  function sweep(pts,rk,o){
+    o=o||{}; const cur=new T.CatmullRomCurve3(pts), N=o.n||64, M=o.m||20, ref=o.ref||V(0,0,1), cap=o.cap===undefined?0.06:o.cap, pos=[], idx=[];
+    const rAt=t=>{ let i=0; while(i<rk.length-2&&rk[i+1][0]<t) i++; const a=rk[i],b=rk[Math.min(i+1,rk.length-1)], u=b[0]>a[0]?Math.min(1,Math.max(0,(t-a[0])/(b[0]-a[0]))):0, s=u*u*(3-2*u); return [a[1]+(b[1]-a[1])*s,a[2]+(b[2]-a[2])*s]; };
+    for(let i=0;i<=N;i++){
+      const t=i/N, P=cur.getPointAt(t), Tg=cur.getTangentAt(t).normalize();
+      let B=new T.Vector3().crossVectors(Tg,ref); if(B.lengthSq()<0.01) B.crossVectors(Tg,V(1,0,0)); B.normalize();
+      const Nn=new T.Vector3().crossVectors(B,Tg).normalize();
+      let [ra,rb]=rAt(t); const ce=cap?(t<cap?Math.sqrt(1-Math.pow(1-t/cap,2)):t>1-cap?Math.sqrt(1-Math.pow(1-(1-t)/cap,2)):1):1;
+      const wob=o.wob?o.wob(t):1; ra*=ce*wob; rb*=ce*wob;
+      for(let j=0;j<=M;j++){ const a=2*Math.PI*j/M, c=Math.cos(a), s=Math.sin(a); pos.push(P.x+B.x*ra*c+Nn.x*rb*s,P.y+B.y*ra*c+Nn.y*rb*s,P.z+B.z*ra*c+Nn.z*rb*s); }
+    }
+    for(let i=0;i<N;i++) for(let j=0;j<M;j++){ const a=i*(M+1)+j,b=a+M+1; idx.push(a,b,a+1,b,b+1,a+1); }
+    const g=new T.BufferGeometry(); g.setAttribute('position',new T.Float32BufferAttribute(pos,3)); g.setIndex(idx); g.computeVertexNormals(); return g;
+  }
+  function blob(c,r,fn,seg){ // biçimlendirilebilir elipsoit
+    const g=new T.SphereGeometry(1,seg||48,Math.round((seg||48)*0.75)), pa=g.attributes.position, p=V(0,0,0);
+    for(let i=0;i<pa.count;i++){ p.set(pa.getX(i),pa.getY(i),pa.getZ(i)); if(fn) fn(p); pa.setXYZ(i,c.x+p.x*r.x,c.y+p.y*r.y,c.z+p.z*r.z); }
+    g.computeVertexNormals(); return g;
+  }
+  (function buildBody(){
+    const cx=TOR.cx, skinGeos=[];
+    // ---- deri: gövde + boyun
+    { const NY=150, NA=84, y0=-10.7, y1=6.7, pos=[], idx=[];
+      for(let j=0;j<=NY;j++){ const y=y0+(y1-y0)*j/NY; for(let i=0;i<=NA;i++){ const p=bodyPt(y,-Math.PI+2*Math.PI*i/NA); pos.push(p.x,p.y,p.z); } }
+      for(let j=0;j<NY;j++) for(let i=0;i<NA;i++){ const a=j*(NA+1)+i,b=a+NA+1; idx.push(a,b,a+1,b,b+1,a+1); }
+      const g=new T.BufferGeometry(); g.setAttribute('position',new T.Float32BufferAttribute(pos,3)); g.setIndex(idx); g.computeVertexNormals(); skinGeos.push(g); }
+    // ---- baş: arkası dolgun, çene daralır, burun ve kulaklar
+    skinGeos.push(blob(V(cx,8.0,-0.45),V(1.6,2.15,1.95),p=>{
+      const u=p.y; if(u<0){ p.x*=1-0.3*u*u; if(p.z>0) p.z*=1-0.12*u*u; }
+      if(p.z<0&&u>-0.4) p.z*=1.08;
+      if(p.z>0){ const g=(v,s)=>Math.exp(-v*v/(2*s*s)); p.z+=0.17*g(p.x,0.1)*g(u+0.12,0.13); p.z-=0.05*g(Math.abs(p.x)-0.36,0.12)*g(u-0.12,0.08); }
+    },56));
+    for(const s of [-1,1]) skinGeos.push(blob(V(cx+s*1.55,7.85,-0.55),V(0.2,0.48,0.32),null,16));
+    // ---- kollar (anatomik pozisyon: avuç önde, başparmak dışta)
+    for(const s of [-1,1]){
+      skinGeos.push(sweep([V(cx+s*3.55,3.0,-0.72),V(cx+s*4.2,1.2,-0.8),V(cx+s*4.5,-1.6,-0.88),V(cx+s*4.72,-4.2,-0.82),V(cx+s*4.98,-7.0,-0.4),V(cx+s*5.18,-9.6,-0.12)],
+        [[0,1.22,1.28],[0.12,1.06,1.18],[0.42,0.86,0.92],[0.53,0.72,0.76],[0.63,0.82,0.8],[0.86,0.6,0.48],[1,0.52,0.36]],{n:72,m:22,cap:0.04}));
+      skinGeos.push(sweep([V(cx+s*5.2,-9.4,-0.1),V(cx+s*5.3,-10.6,-0.02),V(cx+s*5.38,-11.8,0.04),V(cx+s*5.42,-12.7,0.06)],
+        [[0,0.5,0.3],[0.3,0.68,0.27],[0.75,0.6,0.2],[1,0.4,0.14]],{n:24,m:18,cap:0.18}));
+      skinGeos.push(sweep([V(cx+s*5.5,-10.0,0.05),V(cx+s*5.85,-10.8,0.3),V(cx+s*6.0,-11.5,0.42)],[[0,0.2,0.18],[1,0.15,0.13]],{n:14,m:12,cap:0.25}));
+    }
+    // ---- bacaklar ve ayaklar
+    for(const s of [-1,1]){
+      skinGeos.push(sweep([V(cx+s*1.9,-7.6,-0.35),V(cx+s*1.95,-12.2,-0.15),V(cx+s*1.62,-18.6,-0.15),V(cx+s*1.55,-21.8,-0.5),V(cx+s*1.5,-26.9,-0.55)],
+        [[0,2.0,2.05],[0.2,1.78,1.85],[0.5,1.2,1.25],[0.56,1.06,1.12],[0.66,1.12,1.3],[0.76,1.08,1.22],[0.93,0.66,0.68],[1,0.6,0.62]],{n:90,m:24,cap:0.03}));
+      skinGeos.push(sweep([V(cx+s*1.5,-27.5,-1.0),V(cx+s*1.56,-28.0,0.3),V(cx+s*1.68,-28.2,1.6),V(cx+s*1.78,-28.3,2.55)],
+        [[0,0.52,0.55],[0.3,0.62,0.5],[0.72,0.76,0.32],[1,0.6,0.2]],{n:28,m:18,cap:0.16,ref:V(0,1,0)}));
+    }
+    const skin=ghost(0x9ec3dc,0.03,0.5,{rim:0x4f88b5}); skin.depthFunc=T.LessEqualDepth; BOD.skinMats.push(skin);
+    const pre=new T.MeshBasicMaterial({colorWrite:false,transparent:true,depthWrite:true});
+    skinGeos.forEach(g=>{ const d=new T.Mesh(g,pre); d.renderOrder=30; const m=new T.Mesh(g,skin); m.renderOrder=31; bodyG.add(d,m); });
+
+    // ---- organ siluetleri (şimdilik pasif; yalnız kalp aktif)
+    const org=(id,geos,ro)=>{ const mat=ghost(0x8395ad,0.1,0.42,{rim:0x51627a,hole:new T.Vector4(0.05,0.3,0,1.35)}); BOD.silMats.push(mat); const list=[];
+      geos.forEach(g=>{ const m=new T.Mesh(g,mat); m.renderOrder=ro||14; m.userData.organ=id; bodyG.add(m); list.push(m); }); BOD.organs.push({id,mat,meshes:list}); };
+    const SIL=torsoG.userData.sil;
+    org('beyin',[blob(V(cx,8.6,-0.5),V(1.32,1.12,1.62),p=>{ const k=1+0.035*Math.sin(p.x*15+p.y*7)*Math.sin(p.z*13-p.y*5); p.multiplyScalar(k); if(p.y<-0.2) p.y=-0.2+(p.y+0.2)*0.6; p.x*=1-0.08*Math.exp(-p.x*p.x*80)*Math.max(0,p.y); },56),
+      blob(V(cx,7.55,-1.5),V(0.92,0.55,0.62),null,28)]);
+    org('akciger',SIL.lung,12);
+    org('soluk',SIL.air,13);
+    org('ozofagus',[sweep([V(cx,6.0,-0.92),V(cx,3.5,-1.15),V(cx+0.3,0.4,-1.7),V(cx+0.95,-1.2,-1.25),V(cx+1.6,-1.8,-0.8)],[[0,0.2,0.18],[1,0.24,0.22]],{n:48,m:10,cap:0.02})],13);
+    org('karaciger',[SIL.liver],13);
+    org('mide',[sweep([V(cx+1.55,-1.7,-0.7),V(cx+2.35,-2.35,-0.2),V(cx+2.2,-3.4,0.35),V(cx+1.2,-4.05,0.75),V(cx+0.1,-3.75,0.55),V(cx-0.35,-3.3,0.3)],
+      [[0,0.72,0.72],[0.18,0.92,0.88],[0.5,0.8,0.74],[0.8,0.52,0.48],[1,0.34,0.34]],{n:48,m:18,cap:0.1})],14);
+    org('dalak',[blob(V(cx+2.85,-2.4,-1.35),V(0.42,0.92,0.68),p=>{ const y=p.y; p.y=y*Math.cos(0.4)-p.x*Math.sin(0.4); p.x=p.x*Math.cos(0.4)+y*Math.sin(0.4); },24)],14);
+    org('pankreas',[sweep([V(cx-0.45,-3.95,-0.55),V(cx+0.6,-3.5,-0.95),V(cx+1.7,-3.0,-1.2),V(cx+2.5,-2.85,-1.3)],[[0,0.42,0.32],[1,0.2,0.16]],{n:28,m:12,cap:0.12})],14);
+    const kid=[]; for(const s of [-1,1]){ const ky=s<0?-4.3:-3.9;
+      kid.push(blob(V(cx+s*1.55,ky,-1.6),V(0.52,0.95,0.42),p=>{ if(s*p.x<0) p.x*=0.6+0.4*Math.min(1,Math.abs(p.y)*1.6); const y=p.y; p.x+=s*0.15*y*y; },24));
+      kid.push(sweep([V(cx+s*1.3,ky-0.8,-1.5),V(cx+s*1.15,-6.6,-1.3),V(cx+s*0.9,-8.4,-0.6),V(cx+s*0.45,-9.0,0.25)],[[0,0.07,0.07],[1,0.07,0.07]],{n:30,m:6,cap:0}));
+    }
+    org('bobrek',kid,14);
+    const coil=[]; for(let k=0;k<6;k++){ const y=-5.05-k*0.5, dir=k%2?-1:1; for(let i=0;i<=5;i++){ const u=i/5, x=dir*(-1.65+3.3*u)*(1-0.12*Math.abs(k-2.5)/2.5); coil.push(V(cx+x,y+0.14*Math.sin(u*9+k),0.55+0.32*Math.sin(u*7+k*1.7))); } }
+    org('ince',[sweep(coil,[[0,0.27,0.27],[1,0.27,0.27]],{n:260,m:10,cap:0.01})],13);
+    org('kalin',[sweep([V(cx-2.3,-7.7,0.5),V(cx-2.55,-6.0,0.3),V(cx-2.5,-4.45,0.1),V(cx-1.8,-4.15,0.95),V(cx,-4.65,1.3),V(cx+1.8,-4.1,0.95),V(cx+2.65,-3.8,-0.2),V(cx+2.78,-5.5,-0.15),V(cx+2.6,-7.4,0.1),V(cx+1.4,-8.25,0.6),V(cx+0.3,-7.95,0.3),V(cx,-8.9,-0.95),V(cx,-10.2,-1.0)],
+      [[0,0.55,0.55],[0.06,0.5,0.5],[1,0.36,0.36]],{n:220,m:12,cap:0.015,wob:t=>1+0.09*Math.sin(t*150)})],13);
+    org('mesane',[blob(V(cx,-9.15,0.5),V(0.75,0.6,0.65),p=>{ if(p.y>0) p.y*=0.8; },24)],14);
+    // kalbin çevresinde görünmez, kolay tıklanan bir hedef
+    BOD.hit=new T.Mesh(new T.SphereGeometry(1.75,16,12),new T.MeshBasicMaterial({visible:false})); BOD.hit.position.set(0.05,0.3,0); bodyG.add(BOD.hit);
+  })();
+  const BODY_VIEW={pos:V(TOR.cx+8,-2.0,72),target:V(TOR.cx,-8.6,0)};
+  function bodyTheme(dark){
+    BOD.dark=dark;
+    BOD.skinMats.forEach(m=>{ m.uniforms.uC.value.set(dark?0x8fb8d8:0x9ec3dc); m.uniforms.uR.value.set(dark?0xbfe0ff:0x3f7cab); m.uniforms.uA0.value=dark?0.04:0.03; m.uniforms.uA1.value=dark?0.55:0.45; });
+    BOD.silMats.forEach(m=>{ m.uniforms.uC.value.set(dark?0x6f86a3:0x8395ad); m.uniforms.uR.value.set(dark?0xa9bfdc:0x51627a); });
+  }
+  bodyTheme(false);
+  function bodyPick(cx,cy){ // {id, hit} — kalp her zaman öncelikli
+    const r=renderer.domElement.getBoundingClientRect();
+    ndc.set(((cx-r.left)/r.width)*2-1,-((cy-r.top)/r.height)*2+1); ray.setFromCamera(ndc,camera);
+    if(ray.intersectObject(BOD.hit,false).length) return 'kalp';
+    if(R&&ray.intersectObjects(R.pickables.filter(o=>o.visible),false).length) return 'kalp';
+    const ms=[]; BOD.organs.forEach(o=>o.meshes.forEach(m=>ms.push(m)));
+    const h=ray.intersectObjects(ms,false); return h.length?h[0].object.userData.organ:null;
+  }
+  function bodyStep(){
+    if(!BOD.on) return;
+    const now=performance.now(), t=(now-BOD.t0)/1000;
+    // hafif salınım: vücut kendi ekseninde yavaşça sağa sola döner (yakınlaşırken sıfırlanır)
+    const target=BOD.zoom?0:(reduceMotion?0:0.32*Math.sin(t*0.32));
+    BOD.sway+=(target-BOD.sway)*(BOD.zoom?0.08:1); BODY.rotation.y=BOD.sway;
+    let a=1, hov=BOD.hover;
+    if(BOD.zoom){ const k=Math.min(1,(now-BOD.zoom.s)/BOD.zoom.d); a=1-Math.min(1,Math.max(0,(k-0.25)/0.6)); if(k>=1&&!camAnim){ const cb=BOD.zoom.cb; BOD.zoom=null; api.setBody(false); BODY.rotation.y=0; cb&&cb(); return; } }
+    BOD.skinMats.forEach(m=>m.uniforms.uA.value=a);
+    BOD.organs.forEach(o=>{ o.mat.uniforms.uA.value=a*(hov===o.id?1.9:1); });
+  }
+  const reduceMotion=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   function flyTo(pos,target,dur){ camAnim={p0:camera.position.clone(),t0:controls.target.clone(),p1:pos.clone(),t1:target.clone(),s:performance.now(),d:dur||900}; }
   function camStep(){ if(!camAnim) return; let k=(performance.now()-camAnim.s)/camAnim.d; if(k>=1){k=1;} const e=k<0.5?2*k*k:1-Math.pow(-2*k+2,2)/2; camera.position.lerpVectors(camAnim.p0,camAnim.p1,e); controls.target.lerpVectors(camAnim.t0,camAnim.t1,e); if(k>=1) camAnim=null; }
 
@@ -1172,8 +1300,19 @@ function create(el,opts){
     setOthers(v){ state.others=v; applyStatic(); },
     setDim(map){ state.dim=map||{}; applyStatic(); }, // sistem katmanı: seçili sistem dışındaki parçaların saydamlığı
     topOf,
-    setTorso(on,fly){ const ch=state.torso!==!!on; state.torso=!!on; torsoG.visible=!!on; if(ch&&fly!==false){ if(on) flyTo(TORSO_VIEW.pos,TORSO_VIEW.target); else flyTo(HOME.pos,HOME.target); } },
+    setTorso(on,fly){ const ch=state.torso!==!!on; state.torso=!!on; torsoG.visible=!!on&&!BOD.on; if(ch&&fly!==false&&!BOD.on){ if(on) flyTo(TORSO_VIEW.pos,TORSO_VIEW.target); else flyTo(HOME.pos,HOME.target); } },
     torsoView(){ flyTo(TORSO_VIEW.pos,TORSO_VIEW.target); },
+    // giriş ekranı: tüm vücut
+    setBody(on){ on=!!on; if(BOD.on===on) return; BOD.on=on; bodyG.visible=on; BOD.hover=null; renderer.domElement.style.cursor='';
+      if(on){ BOD.zoom=null; torsoG.visible=false; controls.maxDistance=150; controls.autoRotate=false; camAnim=null; camera.position.copy(BODY_VIEW.pos); controls.target.copy(BODY_VIEW.target); controls.update(); BOD.t0=performance.now(); BOD.sway=0; }
+      else { controls.maxDistance=26; BODY.rotation.y=0; torsoG.visible=state.torso; BOD.skinMats.forEach(m=>m.uniforms.uA.value=1); BOD.organs.forEach(o=>o.mat.uniforms.uA.value=1); } },
+    isBody(){ return BOD.on; },
+    bodyView(){ if(BOD.on) flyTo(BODY_VIEW.pos,BODY_VIEW.target,700); },
+    bodyZoom(cb,dur){ if(!BOD.on){ cb&&cb(); return; } dur=dur||1800; BOD.zoom={s:performance.now(),d:dur,cb}; BOD.hover=null; renderer.domElement.style.cursor=''; flyTo(HOME.pos,HOME.target,dur); },
+    bodyTheme,
+    bodyAnchor(){ // kalbin ekrandaki yeri (tuvale göre piksel)
+      const p=V(0.05,0.3,0); BODY.updateMatrixWorld(true); p.applyMatrix4(BODY.matrixWorld).project(camera);
+      const w=renderer.domElement.clientWidth, h=renderer.domElement.clientHeight; return {x:(p.x+1)/2*w,y:(1-p.y)/2*h,vis:p.z<1}; },
     treat, stopTreat(){ clearTX(); }, treating(){ return !!TX; }, _tx(){ return TX; },
     reveal(id){ // bir yapıyı göster: kamerayı ona çevir ve adını iğnele
       if(!R) return; const a=R.anchors.find(x=>x.id===id); if(!a) return;
@@ -1190,7 +1329,7 @@ function create(el,opts){
     dolly(k){ camera.position.sub(controls.target).multiplyScalar(k).add(controls.target); controls.update(); },
     setSpin(on){ controls.autoRotate=!!on; controls.autoRotateSpeed=1.1; },
     setInsets(t,l,r,b){inset.t=t;inset.l=l;inset.r=r;inset.b=b;resize();},
-    resetView(){isoFramed=null; camAnim=null; if(state.torso){ camera.position.copy(TORSO_VIEW.pos); controls.target.copy(TORSO_VIEW.target); controls.update(); return; } camera.position.copy(HOME.pos); controls.target.copy(HOME.target); controls.update();},
+    resetView(){isoFramed=null; camAnim=null; if(BOD.on){ camera.position.copy(BODY_VIEW.pos); controls.target.copy(BODY_VIEW.target); controls.update(); return; } if(state.torso){ camera.position.copy(TORSO_VIEW.pos); controls.target.copy(TORSO_VIEW.target); controls.update(); return; } camera.position.copy(HOME.pos); controls.target.copy(HOME.target); controls.update();},
     viewFrom(name){ // hazır açılar
       let P={inferior:V(1.2,-7.2,5.6)}[name]; if(!P) return; if(state.torso) P=P.clone().multiplyScalar(1.75);
       camera.position.copy(P); controls.target.copy(HOME.target); controls.update();
