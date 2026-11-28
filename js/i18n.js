@@ -92,6 +92,6 @@ const I={
 };
 window.KalpI18n=I;
 /* İngilizce paketleri yalnız gerektiğinde yükle (betik bu noktaya, sırayla eklenir) */
-if(lang==='en') for(const f of ['en-content','en-scenarios','en-lessons','en-quiz','en-cases','en-cases2','en-patients','en-scenarios2','en-cases3','en-organ-kalp','en-ui'])
+if(lang==='en') for(const f of ['en-content','en-scenarios','en-lessons','en-quiz','en-cases','en-cases2','en-patients','en-scenarios2','en-cases3','en-organ-kalp','en-organ-akciger','en-ui'])
   document.write('<script src="js/'+f+'.js"><\/script>');
 })();

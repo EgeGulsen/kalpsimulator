@@ -493,6 +493,15 @@ document.querySelectorAll('[data-speed]').forEach(b=>b.addEventListener('click',
 
 function setMode(m){
   const prev=mode; mode=m; document.body.classList.remove('qtext'); document.body.dataset.mode=m;
+  if(prev==='akciger'&&m!=='akciger'&&window.KalpLung) window.KalpLung.hide();
+  if(m==='akciger'){ // akciğer atlası kendi sayfasını çizer (lung.js)
+    if(prev==='anatomi') leaveSys3D();
+    document.body.classList.remove('deck','bzoom'); deckEl.hidden=true; if(flip) closeFlip(); $('home').hidden=true; $('brand').removeAttribute('aria-current');
+    heart&&heart.setBody&&heart.setBody(false); bodyHover(null); $('btag').hidden=true; vizShow(null); scope.hidden=true;
+    monitor.classList.remove('show','swap'); e12.classList.remove('show'); document.body.classList.remove('live'); vkStop();
+    if(prev==='farmakoloji'){ clearTimeout(dTimer); if(heart&&heart.treating&&heart.treating()) heart.stopTreat(); $('txcap').hidden=true; }
+    return;
+  }
   if(prev==='anatomi'&&m!=='anatomi') leaveSys3D();
   if(heart&&heart.ready) heart.setFocus(effFocus());
   document.body.classList.remove('deck'); deckEl.hidden=true; if(flip) closeFlip();
@@ -544,6 +553,7 @@ function setMode(m){
 }
 function fromHash(){
   const h=location.hash.replace('#','').split('/');
+  if(h[0]==='akciger'&&window.KalpLung){ setMode('akciger'); window.KalpLung.show(h); return; }
   if(h[0]==='durumlar'){ if(h[1]&&COND[h[1]]) condKey=h[1]; setMode('durumlar'); }
   else if(h[0]==='vaka'){ setMode('vaka'); if(h[1]&&CASES.some(c=>c.id===h[1])&&h[1]!==vk.id) startCase(h[1]); }
   else if(h[0]==='sina'){ if(h[1]&&['karisik','ecg','bul','bilgi'].includes(h[1])&&h[1]!==quiz.type){quiz.type=h[1]; quiz.cur=null;} setMode('sina'); }
@@ -1251,13 +1261,14 @@ let bodyTipPin=0;
 function bodyHover(id,x,y){
   if(!btip) return;
   if(!id||mode!=='ana'||document.body.classList.contains('bzoom')){ if(Date.now()>bodyTipPin) btip.hidden=true; return; }
-  const n=ORGAN_N[id]||[id,id], on=id==='kalp', r=stage.getBoundingClientRect();
+  const n=ORGAN_N[id]||[id,id], on=id==='kalp'||id==='akciger'||id==='soluk', r=stage.getBoundingClientRect();
   btip.innerHTML=`<b>${esc(LG(n[0],n[1]))}</b><span class="${on?'on':''}">${on?LG('Aktif · tıkla, yakınlaş','Active · click to zoom in'):LG('Yakında','Coming soon')}</span>`;
   btip.hidden=false; btip.style.left=(x-r.left)+'px'; btip.style.top=(y-r.top)+'px';
 }
 function bodyPick(id){
   if(mode!=='ana') return;
   if(id==='kalp'){ zoomToHeart(); return; }
+  if(id==='akciger'||id==='soluk'){ zoomToLung(); return; }
   if(id){ heart.focusOrgan(id); const r=stage.getBoundingClientRect(); bodyTipPin=Date.now()+1800; bodyHover(id,lastPtr.x||r.left+r.width/2,lastPtr.y||r.top+r.height/2); bodyTipPin=Date.now()+1800; setTimeout(()=>{ if(Date.now()>=bodyTipPin) btip.hidden=true; },1850); }
 }
 $('btnHeartZoom').addEventListener('click',zoomToHeart);
@@ -1271,6 +1282,11 @@ function zoomToHeart(){
   document.body.classList.add('bzoom'); insets();
   if(narrow()) stage.scrollIntoView({behavior:reduce?'auto':'smooth',block:'center'});
   heart.bodyZoom(()=>{ location.hash='#anatomi'; requestAnimationFrame(()=>document.body.classList.remove('bzoom')); },reduce?400:(window.__zoomDur||1900));
+}
+function zoomToLung(){
+  if(!heart||!heart.isBody||!heart.isBody()||document.body.classList.contains('bzoom')) return;
+  btip.hidden=true; btag.hidden=true; heart.focusOrgan('akciger');
+  setTimeout(()=>{ location.hash='#akciger'; },reduce?200:1000);
 }
 function placeBodyTag(){
   if(!btag||!heart||!heart.bodyAnchor||!heart.isBody()||document.body.classList.contains('bzoom')){ if(btag) btag.hidden=true; return; }
@@ -1304,7 +1320,7 @@ function renderHome(){
     ['vaka','Vakalar',`${CASES.length} hasta ve kendi senaryon: tanı koy, tedaviyi seç`,bar(doneCases,CASES.length,`${doneCases}/${CASES.length} vaka bitti`),0],
     ['sina','Sına','EKG’den tanı, kalpte bul, çoktan seçmeli',bar(tot[0],tot[1],tot[1]?`%${Math.round(100*tot[0]/tot[1])} doğru (${tot[1]} soru)`:'Henüz soru çözülmedi'),0]];
   let last='#anatomi'; try{ last=localStorage.getItem('kalp.last')||last; }catch(e){}
-  const lastM=last.replace('#','').split('/')[0], lastN={anatomi:'Anatomi',histoloji:'Histoloji',fizyoloji:'Fizyoloji',durumlar:'Fizyopatoloji',farmakoloji:'Farmakoloji',mikrobiyoloji:'Mikrobiyoloji',yol:'Hastalık yolu',ogren:'EKG dersleri',vaka:'Vakalar',sina:'Sına'}[lastM]||'Anatomi';
+  const lastM=last.replace('#','').split('/')[0], lastN={anatomi:'Anatomi',histoloji:'Histoloji',fizyoloji:'Fizyoloji',durumlar:'Fizyopatoloji',farmakoloji:'Farmakoloji',mikrobiyoloji:'Mikrobiyoloji',yol:'Hastalık yolu',ogren:'EKG dersleri',vaka:'Vakalar',sina:'Sına',akciger:LG('Akciğer atlası','Lung atlas')}[lastM]||'Anatomi';
   const started=sn('a')+sn('d')+sn('l')+nL('h',hs)+nL('f',fs)+nL('r',ds)+nL('m',ms)+tot[1]+doneCases>0;
   el.innerHTML=`<div class="hhero"><div class="eyebrow">${LG('Tıp öğrencileri için 3D kalp atlası','A 3D heart atlas for medical students')}</div><h1>${LG('Kalbi beş mercekte öğren','Learn the heart through five lenses')}</h1>
     <p>${LG('Ders kitabının sırasıyla: yapı, normal işleyiş, bozulma, ilaç ve etken. Her hastalık bir hasta vakasıyla biter.','In textbook order: structure, normal function, what goes wrong, drugs and organisms. Every disease ends with a patient case.')}</p>
@@ -1432,6 +1448,7 @@ function loop(ts){
     sim.step(dt); if(c12.width<10) size12(); draw12();
     heart&&heart.setVector(vecAt(sim.t));
   }
+  if(mode==='akciger') return;
   heart&&heart.frame(lensLive||mode==='ana'||mode==='durumlar'||mode==='ogren'||mode==='vaka'||(mode==='sina'&&quiz.cur&&quiz.cur.t==='ecg'&&quiz.cur.done)?sim:null);
   drawLabels();
 }
@@ -1451,6 +1468,7 @@ function srIndex(){
   VISC().forEach(k=>{ const c=COND[k]; add(LG('Fizyopatoloji','Pathophysiology'),LCOL.fizyopatoloji,'#durumlar/'+k,c.n,c.tag,[c.sum,J(c.why),J(c.ecg),J(c.bul),J(c.lab),c.cli].join(' ')); });
   ORG.FARMA.forEach(x=>add(LG('Farmakoloji','Pharmacology'),LCOL.farmakoloji,'#farmakoloji/'+x.id,x.n,x.ex,[x.hedef,x.mek,J(x.end),J(x.kontr),J(x.yan)].join(' ')));
   ORG.MIKRO.forEach(x=>add(LG('Mikrobiyoloji','Microbiology'),LCOL.mikrobiyoloji,'#mikrobiyoloji/'+x.id,x.n,x.etken.map(e=>e[0]).join(' · '),x.d+' '+J(x.pat)+' '+J(x.tedavi)));
+  if(window.KalpLung) window.KalpLung.index(add);
   ORG.YOLLAR.forEach(y=>add(LG('Hastalık yolu','Disease pathway'),'var(--ink)','#yol/'+y.id,y.n,LG('5 katman + vaka','5 layers + a case'),''));
   CASES.forEach(c=>add(LG('Vaka','Case'),'var(--ink)','#vaka/'+c.id,c.title,c.brief,c.sikayet||''));
   (FAQ||[]).forEach(f=>add(LG('SSS','FAQ'),LCOL.fizyoloji,'#ogren/sss',f[1],f[0],f[2]));

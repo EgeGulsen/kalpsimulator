@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap">
-<link rel="stylesheet" href="css/style.css?v=20261128">
+<link rel="stylesheet" href="css/style.css?v=20261128b">
 <script>try{var t=localStorage.getItem("kalp.theme");if(t==="dark"||t==="light")document.documentElement.dataset.theme=t;}catch(e){}
 (function(){var d=document.documentElement,l=null;try{l=localStorage.getItem("kalp.lang");}catch(e){}if(l!=="tr"&&l!=="en")l=/^tr/i.test(navigator.language||"tr")?"tr":"en";d.lang=l;d.dataset.lang=l;if(l==="en")setTimeout(function(){d.classList.add("i18n-ok");},3000);})();</script>
 </head>
@@ -27,7 +27,7 @@
   <div class="scope" id="scope" hidden aria-live="polite"></div>
   <div class="btag" id="btag" hidden><button class="bchip" id="btnHeartZoom" type="button" aria-label="Kalbe yakınlaş ve kalp atlasını aç"><i class="bdot" aria-hidden="true"></i><b>Kalp</b><span>Aktif · incele</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg></button><i class="bstem" aria-hidden="true"></i><i class="bring" aria-hidden="true"></i></div>
   <div class="btip" id="btip" hidden></div>
-  <div class="blegend" id="blegend" aria-label="Vücut haritası"><b>Vücut haritası</b><span><i class="lg-on" aria-hidden="true"></i>Kalp · aktif</span><span><i class="lg-off" aria-hidden="true"></i>Diğer organlar · yakında</span><small>Tekerlek: imlecin olduğu yere yakınlaş · Sürükle: döndür · Sağ tık: kaydır · Organa tıkla: odaklan</small></div>
+  <div class="blegend" id="blegend" aria-label="Vücut haritası"><b>Vücut haritası</b><span><i class="lg-on" aria-hidden="true"></i>Kalp ve akciğer · aktif</span><span><i class="lg-off" aria-hidden="true"></i>Diğer organlar · yakında</span><small>Tekerlek: imlecin olduğu yere yakınlaş · Sürükle: döndür · Sağ tık: kaydır · Organa tıkla: odaklan</small></div>
   <div class="bzctl" role="group" aria-label="Yakınlaştırma"><button type="button" id="bzIn" aria-label="Yakınlaştır">+</button><button type="button" id="bzOut" aria-label="Uzaklaştır">−</button><button type="button" id="bzAll" aria-label="Tüm vücudu göster" title="Tüm vücut"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button></div>
 </div>
 
@@ -51,6 +51,7 @@
 
 <section class="home" id="home" aria-label="Ana sayfa" hidden></section>
 <section class="deck" id="deck" aria-label="Vaka destesi" hidden></section>
+<section class="lung" id="lung" aria-label="Akciğer atlası" hidden></section>
 
 <section class="monitor" id="monitor" aria-label="Örnek EKG">
   <div class="hrbox">
@@ -125,21 +126,26 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
-<script src="js/content.js?v=20261128"></script>
-<script src="js/scenarios.js?v=20261128"></script>
-<script src="js/lessons.js?v=20261128"></script>
-<script src="js/quiz.js?v=20261128"></script>
-<script src="js/cases.js?v=20261128"></script>
-<script src="js/cases2.js?v=20261128"></script>
-<script src="js/patients.js?v=20261128"></script>
-<script src="js/scenarios2.js?v=20261128"></script>
-<script src="js/cases3.js?v=20261128"></script>
-<script src="js/organ-kalp.js?v=20261128"></script>
-<script src="js/viz.js?v=20261128"></script>
-<script src="js/ecg12.js?v=20261128"></script>
-<script src="js/i18n.js?v=20261128"></script>
-<script src="js/sim.js?v=20261128"></script>
-<script src="js/heart3d.js?v=20261128"></script>
-<script src="js/app.js?v=20261128"></script>
+<script src="js/content.js?v=20261128b"></script>
+<script src="js/scenarios.js?v=20261128b"></script>
+<script src="js/lessons.js?v=20261128b"></script>
+<script src="js/quiz.js?v=20261128b"></script>
+<script src="js/cases.js?v=20261128b"></script>
+<script src="js/cases2.js?v=20261128b"></script>
+<script src="js/patients.js?v=20261128b"></script>
+<script src="js/scenarios2.js?v=20261128b"></script>
+<script src="js/cases3.js?v=20261128b"></script>
+<script src="js/organ-kalp.js?v=20261128b"></script>
+<script src="js/organ-akciger.js?v=20261128b"></script>
+<script src="js/viz.js?v=20261128b"></script>
+<script src="js/ecg12.js?v=20261128b"></script>
+<script src="js/i18n.js?v=20261128b"></script>
+<script src="js/sim.js?v=20261128b"></script>
+<script src="js/heart3d.js?v=20261128b"></script>
+<script src="js/lung3d.js?v=20261128b"></script>
+<script src="js/lung-viz.js?v=20261128b"></script>
+<script src="js/lung-audio.js?v=20261128b"></script>
+<script src="js/lung.js?v=20261128b"></script>
+<script src="js/app.js?v=20261128b"></script>
 </body>
 </html>

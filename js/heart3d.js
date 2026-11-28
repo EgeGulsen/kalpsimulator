@@ -1214,10 +1214,12 @@ function create(el,opts){
     const dir=camera.position.clone().sub(controls.target).normalize(), dist=Math.max(6,rad/Math.tan(camera.fov*Math.PI/360)*1.35);
     flyTo(c.clone().addScaledVector(dir,dist),c,900);
   }
+  const ACTIVE={akciger:1,soluk:1};
   function bodyTheme(dark){
     BOD.dark=dark;
     BOD.skinMats.forEach(m=>{ m.uniforms.uC.value.set(dark?0x8fb8d8:0x9ec3dc); m.uniforms.uR.value.set(dark?0xbfe0ff:0x3f7cab); m.uniforms.uA0.value=dark?0.04:0.03; m.uniforms.uA1.value=dark?0.55:0.45; });
     BOD.silMats.forEach(m=>{ m.uniforms.uC.value.set(dark?0x6f86a3:0x8395ad); m.uniforms.uR.value.set(dark?0xa9bfdc:0x51627a); });
+    BOD.organs.forEach(o=>{ if(ACTIVE[o.id]){ o.mat.uniforms.uC.value.set(dark?0xd98b95:0xe39aa3); o.mat.uniforms.uR.value.set(dark?0xffc6cd:0xb34e5b); } }); // açılmış organlar renkli
   }
   bodyTheme(false);
   function bodyPick(cx,cy){ // {id, hit} — kalp her zaman öncelikli
