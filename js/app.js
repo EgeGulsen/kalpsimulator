@@ -28,6 +28,8 @@ try{
       const r=stage.getBoundingClientRect();
       tip.textContent=S[id]?S[id].n:id; tip.hidden=false; tip.style.left=(x-r.left)+'px'; tip.style.top=(y-r.top)+'px';
     },
+    onBodyPick:(id)=>bodyPick(id),
+    onBodyHover:(id,x,y)=>bodyHover(id,x,y),
     onReady:()=>{loading.hidden=true; heart.setFocus(effFocus()); if(partsOpen) renderParts(); heart.setTorso(torsoWanted()); if(mode==='ana'){applyHome3D();} else if(isLens(mode)){ enterLens(mode); } else if(mode==='ogren'){applyLearn3D();} else if(mode==='sina'){applyQ3D();} else if(mode==='vaka'){applyV3D();} else heart.setMode(mode,mode==='durumlar'?COND[condKey]:null,condKey); if(!isLens(mode)) heart.setXray(xray.checked); if(mode==='anatomi') applySys3D(); heart.select(selected); insets(); if(mode==='durumlar'&&(COND[condKey].fx||{}).infarct==='rca'){heart.viewFrom('inferior'); lastView=true;}},
     onError:()=>{loading.innerHTML='3D model yüklenemedi. Dosyayı doğrudan açtıysan bir yerel sunucu ile aç<br>(ör. <code>python3 -m http.server</code>).';}
   });
@@ -39,6 +41,7 @@ try{
 /* Kalp kendi kartının içinde durur; yalnız alttaki araç çubuğu kadar yukarı kaydır */
 function insets(){
   if(!heart||!heart.setInsets) return;
+  if(mode==='ana'&&!document.body.classList.contains('bzoom')){ heart.setInsets(0,narrow()?0:Math.min(470,Math.round(stage.clientWidth*0.36)),0,0); return; }
   heart.setInsets(0,0,0,narrow()?0:62);
 }
 window.addEventListener('resize',()=>{insets(); sizeCanvas();});
@@ -499,7 +502,8 @@ function setMode(m){
   if(prev==='farmakoloji'&&m!=='farmakoloji'){ clearTimeout(dTimer); if(heart&&heart.treating&&heart.treating()) heart.stopTreat(); $('txcap').hidden=true; }
   if(prev!==m&&(prev==='histoloji'||m==='histoloji'||m==='anatomi')) renderSysbar();
   if(m==='ana') $('brand').setAttribute('aria-current','page'); else $('brand').removeAttribute('aria-current');
-  $('home').hidden=m!=='ana'; heart&&heart.setSpin&&heart.setSpin(m==='ana'&&!reduce);
+  $('home').hidden=m!=='ana'; heart&&heart.setSpin&&heart.setSpin(false);
+  if(m!=='ana'){ heart&&heart.setBody&&heart.setBody(false); bodyHover(null); $('btag').hidden=true; }
   if(m!=='ana') try{ localStorage.setItem('kalp.last',location.hash||'#'+m); }catch(e){}
   const live=m==='durumlar', learnM=m==='ogren';
   document.body.classList.toggle('live',live||learnM);
@@ -1240,12 +1244,43 @@ function enterLens(m,prev){
   void prev; render(); renderNav();
 }
 
+/* ---------- Ana sayfa: saydam vücut; yalnız kalp aktif, diğer organlar siluet ---------- */
+const ORGAN_N={kalp:['Kalp','Heart'],beyin:['Beyin','Brain'],akciger:['Akciğerler','Lungs'],soluk:['Trakea ve bronşlar','Trachea and bronchi'],ozofagus:['Özofagus','Oesophagus'],karaciger:['Karaciğer','Liver'],mide:['Mide','Stomach'],dalak:['Dalak','Spleen'],pankreas:['Pankreas','Pancreas'],bobrek:['Böbrekler ve üreterler','Kidneys and ureters'],ince:['İnce bağırsak','Small intestine'],kalin:['Kalın bağırsak','Large intestine'],mesane:['Mesane','Bladder']};
+const btip=$('btip'), btag=$('btag');
+let bodyTipPin=0;
+function bodyHover(id,x,y){
+  if(!btip) return;
+  if(!id||mode!=='ana'||document.body.classList.contains('bzoom')){ if(Date.now()>bodyTipPin) btip.hidden=true; return; }
+  const n=ORGAN_N[id]||[id,id], on=id==='kalp', r=stage.getBoundingClientRect();
+  btip.innerHTML=`<b>${esc(LG(n[0],n[1]))}</b><span class="${on?'on':''}">${on?LG('Aktif · tıkla, yakınlaş','Active · click to zoom in'):LG('Yakında','Coming soon')}</span>`;
+  btip.hidden=false; btip.style.left=(x-r.left)+'px'; btip.style.top=(y-r.top)+'px';
+}
+function bodyPick(id){
+  if(mode!=='ana') return;
+  if(id==='kalp'){ zoomToHeart(); return; }
+  if(id){ const r=stage.getBoundingClientRect(); bodyTipPin=Date.now()+1800; bodyHover(id,lastPtr.x||r.left+r.width/2,lastPtr.y||r.top+r.height/2); bodyTipPin=Date.now()+1800; setTimeout(()=>{ if(Date.now()>=bodyTipPin) btip.hidden=true; },1850); }
+}
+$('btnHeartZoom').addEventListener('click',zoomToHeart);
+const lastPtr={x:0,y:0}; stage.addEventListener('pointerdown',e=>{lastPtr.x=e.clientX; lastPtr.y=e.clientY;});
+function zoomToHeart(){
+  if(!heart||!heart.isBody||!heart.isBody()||document.body.classList.contains('bzoom')) return;
+  btip.hidden=true; btag.hidden=true;
+  document.body.classList.add('bzoom'); insets();
+  if(narrow()) stage.scrollIntoView({behavior:reduce?'auto':'smooth',block:'center'});
+  heart.bodyZoom(()=>{ location.hash='#anatomi'; requestAnimationFrame(()=>document.body.classList.remove('bzoom')); },reduce?400:(window.__zoomDur||1900));
+}
+function placeBodyTag(){
+  if(!btag||!heart||!heart.bodyAnchor||!heart.isBody()||document.body.classList.contains('bzoom')){ if(btag) btag.hidden=true; return; }
+  const a=heart.bodyAnchor(); if(!a.vis){ btag.hidden=true; return; }
+  btag.hidden=false; btag.style.transform=`translate(${Math.round(a.x)}px,${Math.round(a.y)}px)`;
+}
+
 /* ---------- Ana sayfa ---------- */
 function applyHome3D(){
   if(mode!=='ana') return;
   if(sim.key!=='nsr') sim.setCondition('nsr');
   if(!heart||!heart.ready) return;
-  heart.setMode('durumlar',COND.nsr,'nsr'); heart.setXray(false); heart.setTorso(false); heart.select(null); heart.resetView(); heart.dolly(1.3); heart.setSpin(!reduce); insets();
+  heart.setMode('durumlar',COND.nsr,'nsr'); heart.setXray(false); heart.setTorso(false); heart.select(null); heart.setSpin(false); heart.setBody(true); heart.bodyTheme(isDark()); insets();
 }
 function renderHome(){
   const el=$('home'); if(!el) return;
@@ -1283,6 +1318,7 @@ const isDark=()=>root.dataset.theme?root.dataset.theme==='dark':darkMQ.matches;
 function themeColors(){
   ECG=cssv('--ecg-ink')||ECG; PAPER=cssv('--ecg-paper')||PAPER; GRID=cssv('--ecg-minor')||GRID; GRID2=cssv('--ecg-major')||GRID2; MUTED=cssv('--ecg-label')||MUTED;
   OFF=isDark()?[44,55,72]:[229,220,221];
+  if(heart&&heart.bodyTheme) heart.bodyTheme(isDark());
   document.querySelectorAll('.themebtn').forEach(b=>b.setAttribute('aria-pressed',isDark()));
 }
 function setTheme(next){ root.dataset.theme=next; try{ localStorage.setItem('kalp.theme',next); }catch(e){} themeColors(); }
@@ -1383,7 +1419,7 @@ function loop(ts){
     sim.step(dt); if(cv.width<10) sizeCanvas(); drawECG();
     if(ts-hrTick>500){hrTick=ts; const hr=sim.heartRate(), v=COND[quiz.cur.key].r.vent; $('hrv').textContent= v==='vf'?'—':hr==null?'--':hr;}
   }
-  if(mode==='ana') sim.step(dt);
+  if(mode==='ana'){ sim.step(dt); placeBodyTag(); }
   const lensLive=mode==='fizyoloji'||mode==='farmakoloji'||mode==='mikrobiyoloji'||mode==='yol';
   if(lensLive){ sim.step(dt); const m=sim.mechanics(); if(bA) bA.style.background=m.af?mix(OFF,AF,m.fib):mix(OFF,RED,m.ca); if(bV) bV.style.background=mix(OFF,RED,m.cv); }
   if(mode==='fizyoloji') phys.frame(reduce?0:dt);
