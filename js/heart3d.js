@@ -1349,7 +1349,8 @@ function create(el,opts){
     // giriş ekranı: tüm vücut
     setBody(on){ on=!!on; if(BOD.on===on) return; BOD.on=on; bodyG.visible=on; BOD.hover=null; renderer.domElement.style.cursor='';
       if(on){ loadBodyModel(); BOD.zoom=null; BOD.user=false; torsoG.visible=false; controls.maxDistance=150; controls.minDistance=1.5; controls.autoRotate=false; camAnim=null; camera.position.copy(BODY_VIEW.pos); controls.target.copy(BODY_VIEW.target); controls.update(); BOD.t0=performance.now(); BOD.sway=0; }
-      else { controls.maxDistance=26; controls.minDistance=3.5; BODY.rotation.y=0; torsoG.visible=state.torso; BOD.skinMats.forEach(m=>m.uniforms.uA.value=1); BOD.organs.forEach(o=>o.mat.uniforms.uA.value=1); } },
+      else { const zoomed=!!BOD.zoom; BOD.zoom=null; camAnim=null; controls.maxDistance=26; controls.minDistance=3.5; BODY.rotation.y=0;
+        if(!zoomed){ const v=state.torso?TORSO_VIEW:HOME; camera.position.copy(v.pos); controls.target.copy(v.target); controls.update(); } /* ana sayfadan başka ekrana geçince kamera kalbe döner */ torsoG.visible=state.torso; BOD.skinMats.forEach(m=>m.uniforms.uA.value=1); BOD.organs.forEach(o=>o.mat.uniforms.uA.value=1); } },
     isBody(){ return BOD.on; },
     bodyView(){ if(BOD.on){ BOD.user=false; flyTo(BODY_VIEW.pos,BODY_VIEW.target,800); } },
     _cam(){ return {p:camera.position.toArray().map(v=>+v.toFixed(2)),t:controls.target.toArray().map(v=>+v.toFixed(2))}; },
