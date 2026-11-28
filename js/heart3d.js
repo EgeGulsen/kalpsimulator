@@ -1082,7 +1082,7 @@ function create(el,opts){
      Boy ≈ 38 birim (1 birim ≈ 4,5 cm): baş tepesi ≈ +10, ayak tabanı ≈ −28.
      ===================================================================== */
   const bodyG=new T.Group(); bodyG.visible=false; BODY.add(bodyG);
-  const BOD={on:false,fade:1,sway:0,organs:[],hit:null,skinMats:[],silMats:[],dark:false,zoom:null,t0:performance.now()};
+  const BOD={skinMeshes:[],real:false,loading:false,user:false,on:false,fade:1,sway:0,organs:[],hit:null,skinMats:[],silMats:[],dark:false,zoom:null,t0:performance.now()};
   const BSK=[[-10.7,1.1,0.9,2.2,0.2],[-10.2,2.7,1.85,2.4,0.25],[-9.3,3.6,2.25,2.5,0.25],[-8.0,3.78,2.28,2.4,0.2],[-6.8,3.5,2.2,2.3,0.15]].concat(SKIN.slice(0,-1),[[5.2,1.36,1.42,2.0,-0.55],[6.7,1.3,1.38,2.0,-0.5]]);
   function bodyPt(y,a){
     const [rx,rz,e,dz]=profAt(BSK,y), p=shell(BSK,y,a,1), cx=TOR.cx, cz=TOR.cz+dz;
@@ -1140,7 +1140,8 @@ function create(el,opts){
     }
     const skin=ghost(0x9ec3dc,0.03,0.5,{rim:0x4f88b5}); skin.depthFunc=T.LessEqualDepth; BOD.skinMats.push(skin);
     const pre=new T.MeshBasicMaterial({colorWrite:false,transparent:true,depthWrite:true});
-    skinGeos.forEach(g=>{ const d=new T.Mesh(g,pre); d.renderOrder=30; const m=new T.Mesh(g,skin); m.renderOrder=31; bodyG.add(d,m); });
+    BOD.addSkin=g=>{ const d=new T.Mesh(g,pre); d.renderOrder=30; const m=new T.Mesh(g,skin); m.renderOrder=31; bodyG.add(d,m); BOD.skinMeshes.push(d,m); };
+    skinGeos.forEach(BOD.addSkin);
 
     // ---- organ siluetleri (şimdilik pasif; yalnız kalp aktif)
     const org=(id,geos,ro)=>{ const mat=ghost(0x8395ad,0.1,0.42,{rim:0x51627a,hole:new T.Vector4(0.05,0.3,0,1.35)}); BOD.silMats.push(mat); const list=[];
@@ -1169,7 +1170,50 @@ function create(el,opts){
     // kalbin çevresinde görünmez, kolay tıklanan bir hedef
     BOD.hit=new T.Mesh(new T.SphereGeometry(1.75,16,12),new T.MeshBasicMaterial({visible:false})); BOD.hit.position.set(0.05,0.3,0); bodyG.add(BOD.hit);
   })();
-  const BODY_VIEW={pos:V(TOR.cx+8,-2.0,72),target:V(TOR.cx,-8.6,0)};
+  const BODY_VIEW={pos:V(TOR.cx+9,-4.5,86),target:V(TOR.cx,-10.6,0)};
+  // gerçek model (BodyParts3D deri + organlar): hazır olunca yaklaşık geometrinin yerine geçer
+  function loadBodyModel(){
+    if(BOD.loading) return; BOD.loading=true;
+    loadGLB(['assets/body.glb']).then(g=>{
+      g.scene.updateMatrixWorld(true); const geos={};
+      g.scene.traverse(o=>{ if(!o.isMesh) return; const n=o.name&&ORGAN_IDS.includes(o.name)?o.name:(o.parent&&o.parent.name); const gg=o.geometry.clone(); gg.applyMatrix4(o.matrixWorld); gg.computeVertexNormals(); geos[n]=gg; });
+      if(geos.deri){ BOD.skinMeshes.forEach(m=>bodyG.remove(m)); BOD.skinMeshes=[]; BOD.addSkin(geos.deri); }
+      BOD.organs.forEach(o=>{ const gg=geos[o.id]; if(!gg) return;
+        if(o.id!=='kalin'){ o.meshes.forEach(m=>bodyG.remove(m)); o.meshes=[]; }
+        if(o.id==='beyin'){ const d=new T.Mesh(gg,new T.MeshBasicMaterial({colorWrite:false,transparent:true,depthWrite:true})); d.renderOrder=13; bodyG.add(d); o.mat.depthFunc=T.LessEqualDepth; }
+        const m=new T.Mesh(gg,o.mat); m.renderOrder=o.id==='akciger'?12:14; m.userData.organ=o.id; bodyG.add(m); o.meshes.push(m); });
+      BOD.real=true;
+    }).catch(e=>{ console.warn('Vücut modeli yüklenemedi, yaklaşık model kullanılıyor',e); });
+  }
+  const ORGAN_IDS=['deri','beyin','akciger','soluk','ozofagus','karaciger','mide','dalak','bobrek','ince','kalin','mesane'];
+  // serbest yakınlaşma: tekerlek imlecin altındaki noktaya doğru yaklaştırır
+  function bodyHitPoint(cx,cy){
+    const r=renderer.domElement.getBoundingClientRect();
+    ndc.set(((cx-r.left)/r.width)*2-1,-((cy-r.top)/r.height)*2+1); ray.setFromCamera(ndc,camera);
+    const objs=[]; if(R) R.pickables.forEach(o=>o.visible&&objs.push(o)); BOD.organs.forEach(o=>o.meshes.forEach(m=>objs.push(m))); BOD.skinMeshes.forEach((m,i)=>i%2&&objs.push(m));
+    const h=ray.intersectObjects(objs,false); return h.length?h[0].point.clone():null;
+  }
+  renderer.domElement.addEventListener('wheel',e=>{
+    if(!BOD.on||BOD.zoom) return;
+    e.preventDefault(); e.stopImmediatePropagation(); BOD.user=true; camAnim=null;
+    let p=bodyHitPoint(e.clientX,e.clientY);
+    if(!p){ const n=controls.target.clone().sub(camera.position).normalize(); const pl=new T.Plane().setFromNormalAndCoplanarPoint(n,controls.target); p=ray.ray.intersectPlane(pl,new T.Vector3()); if(!p) return; }
+    // p merkezli ölçekleme: imlecin altındaki nokta ekranda yerinde kalır
+    const dc=camera.position.distanceTo(p), dist=camera.position.distanceTo(controls.target);
+    let k=Math.max(-0.5,Math.min(0.3,-e.deltaY*0.0012));
+    if(k>0&&dc*(1-k)<1.2) k=Math.max(0,1-1.2/dc);
+    if(k<0&&dist>140) return;
+    camera.position.lerp(p,k); controls.target.lerp(p,k);
+  },{capture:true,passive:false});
+  controls.addEventListener('start',()=>{ if(BOD.on){ BOD.user=true; } });
+  function focusOrgan(id){ // organa uç: sınır küresine göre mesafe
+    const o=BOD.organs.find(x=>x.id===id); let c, rad;
+    if(id==='kalp'){ c=V(0.05,0.3,0); rad=1.8; }
+    else if(o){ const b=new T.Box3(); o.meshes.forEach(m=>b.expandByObject(m)); const sp=b.getBoundingSphere(new T.Sphere()); c=sp.center; rad=sp.radius; }
+    if(!c) return; BOD.user=true;
+    const dir=camera.position.clone().sub(controls.target).normalize(), dist=Math.max(6,rad/Math.tan(camera.fov*Math.PI/360)*1.35);
+    flyTo(c.clone().addScaledVector(dir,dist),c,900);
+  }
   function bodyTheme(dark){
     BOD.dark=dark;
     BOD.skinMats.forEach(m=>{ m.uniforms.uC.value.set(dark?0x8fb8d8:0x9ec3dc); m.uniforms.uR.value.set(dark?0xbfe0ff:0x3f7cab); m.uniforms.uA0.value=dark?0.04:0.03; m.uniforms.uA1.value=dark?0.55:0.45; });
@@ -1188,8 +1232,8 @@ function create(el,opts){
     if(!BOD.on) return;
     const now=performance.now(), t=(now-BOD.t0)/1000;
     // hafif salınım: vücut kendi ekseninde yavaşça sağa sola döner (yakınlaşırken sıfırlanır)
-    const target=BOD.zoom?0:(reduceMotion?0:0.32*Math.sin(t*0.32));
-    BOD.sway+=(target-BOD.sway)*(BOD.zoom?0.08:1); BODY.rotation.y=BOD.sway;
+    const target=BOD.zoom||BOD.user?0:(reduceMotion?0:0.32*Math.sin(t*0.32));
+    BOD.sway+=(target-BOD.sway)*(BOD.zoom||BOD.user?0.08:1); BODY.rotation.y=BOD.sway;
     let a=1, hov=BOD.hover;
     if(BOD.zoom){ const k=Math.min(1,(now-BOD.zoom.s)/BOD.zoom.d); a=1-Math.min(1,Math.max(0,(k-0.25)/0.6)); if(k>=1&&!camAnim){ const cb=BOD.zoom.cb; BOD.zoom=null; api.setBody(false); BODY.rotation.y=0; cb&&cb(); return; } }
     BOD.skinMats.forEach(m=>m.uniforms.uA.value=a);
@@ -1304,10 +1348,12 @@ function create(el,opts){
     torsoView(){ flyTo(TORSO_VIEW.pos,TORSO_VIEW.target); },
     // giriş ekranı: tüm vücut
     setBody(on){ on=!!on; if(BOD.on===on) return; BOD.on=on; bodyG.visible=on; BOD.hover=null; renderer.domElement.style.cursor='';
-      if(on){ BOD.zoom=null; torsoG.visible=false; controls.maxDistance=150; controls.autoRotate=false; camAnim=null; camera.position.copy(BODY_VIEW.pos); controls.target.copy(BODY_VIEW.target); controls.update(); BOD.t0=performance.now(); BOD.sway=0; }
-      else { controls.maxDistance=26; BODY.rotation.y=0; torsoG.visible=state.torso; BOD.skinMats.forEach(m=>m.uniforms.uA.value=1); BOD.organs.forEach(o=>o.mat.uniforms.uA.value=1); } },
+      if(on){ loadBodyModel(); BOD.zoom=null; BOD.user=false; torsoG.visible=false; controls.maxDistance=150; controls.minDistance=1.5; controls.autoRotate=false; camAnim=null; camera.position.copy(BODY_VIEW.pos); controls.target.copy(BODY_VIEW.target); controls.update(); BOD.t0=performance.now(); BOD.sway=0; }
+      else { controls.maxDistance=26; controls.minDistance=3.5; BODY.rotation.y=0; torsoG.visible=state.torso; BOD.skinMats.forEach(m=>m.uniforms.uA.value=1); BOD.organs.forEach(o=>o.mat.uniforms.uA.value=1); } },
     isBody(){ return BOD.on; },
-    bodyView(){ if(BOD.on) flyTo(BODY_VIEW.pos,BODY_VIEW.target,700); },
+    bodyView(){ if(BOD.on){ BOD.user=false; flyTo(BODY_VIEW.pos,BODY_VIEW.target,800); } },
+    _cam(){ return {p:camera.position.toArray().map(v=>+v.toFixed(2)),t:controls.target.toArray().map(v=>+v.toFixed(2))}; },
+    focusOrgan, bodyStep2(k){ if(!BOD.on) return; BOD.user=true; const p=camera.position.clone().sub(controls.target).multiplyScalar(k); flyTo(controls.target.clone().add(p),controls.target.clone(),350); },
     bodyZoom(cb,dur){ if(!BOD.on){ cb&&cb(); return; } dur=dur||1800; BOD.zoom={s:performance.now(),d:dur,cb}; BOD.hover=null; renderer.domElement.style.cursor=''; flyTo(HOME.pos,HOME.target,dur); },
     bodyTheme,
     bodyAnchor(){ // kalbin ekrandaki yeri (tuvale göre piksel)
