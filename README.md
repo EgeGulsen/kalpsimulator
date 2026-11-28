@@ -34,8 +34,8 @@ Doğrudan bir bölüme bağlantı verilebilir: `#durumlar/af`, `#durumlar/stemi_
 
 ## Beş mercek
 
-Kalp ders kitabı sırasıyla beş mercekte öğretilir: **Anatomi + Histoloji → Fizyoloji → Fizyopatoloji →
-Farmakoloji → Mikrobiyoloji**. Her hastalık bir **hastalık yolunda** (`#yol/<id>`) bu beş katmanda gezilir ve
+Kalp ders kitabı sırasıyla beş mercekte öğretilir: **Anatomi + Histoloji → Fizyoloji → Mikrobiyoloji →
+Fizyopatoloji → Farmakoloji**. Her hastalık bir **hastalık yolunda** (`#yol/<id>`) bu beş katmanda gezilir ve
 bir vakayla biter. Ayrıntı ve yeni organ ekleme sırası: [docs/ORGAN-SABLONU.md](docs/ORGAN-SABLONU.md).
 
 ## Sına (kendini sınama)
@@ -107,7 +107,7 @@ js/heart3d.js           GLB modeli yükler; uyarı dalgası, kasılma, ileti sis
 js/scenarios2.js        Aşama 1 durumları (kalp yetmezliği, kapaklar, kardiyomiyopatiler, endokardit, miyokardit,
                         romatizmal ateş), tüm durumlara bulgu/lab ve hasta oluşturucu tedavileri
 js/cases3.js            Hastalık yollarını bitiren vakalar (endokardit, ARF, miyokardit, KY, aort darlığı)
-js/organ-kalp.js        Kalbin beş mercekli organ kaydı (histoloji, fizyoloji, farmakoloji, mikrobiyoloji, yollar)
+js/organ-kalp.js        Kalbin beş mercekli organ kaydı (histoloji, fizyoloji, mikrobiyoloji, farmakoloji, yollar)
 js/viz.js               Mercek görselleri: mikroskop, fizyoloji grafikleri, ilaç ve patogenez sahneleri
 js/i18n.js, js/en-*.js  İngilizce dil desteği ve çeviri paketleri
 docs/ORGAN-SABLONU.md   Yeni bir organı beş mercekle eklemek için şablon

@@ -11,9 +11,9 @@ Her organ ders kitabı sırasıyla, beş mercekte öğretilir:
 |---|--------|------------|----------------------------|
 | 1 | Anatomi + Histoloji | Yapı: 3D model, katmanlar, doku ve hücre | `#anatomi`, `#histoloji/<id>` |
 | 2 | Fizyoloji | Normal işleyiş: akım, basınç, sinyal | `#fizyoloji/<id>`, `#ogren/<ders>` |
-| 3 | Fizyopatoloji | Bozulma: neden → mekanizma → bulgu → EKG/lab | `#durumlar/<durum>` |
-| 4 | Farmakoloji | İlaç nereye bağlanır, hücrede ve organda ne değişir | `#farmakoloji/<id>` |
-| 5 | Mikrobiyoloji | Etken, patogenez, tanı ölçütleri, tedavi ve korunma | `#mikrobiyoloji/<id>` |
+| 3 | Mikrobiyoloji | Etken, patogenez, tanı ölçütleri, tedavi ve korunma | `#mikrobiyoloji/<id>` |
+| 4 | Fizyopatoloji | Bozulma: neden → mekanizma → bulgu → EKG/lab | `#durumlar/<durum>` |
+| 5 | Farmakoloji | İlaç nereye bağlanır, hücrede ve organda ne değişir | `#farmakoloji/<id>` |
 
 Bunlara ek olarak:
 
@@ -71,7 +71,7 @@ aynı `id` ile yazılır (SVG, solda dairesel alan, sağda etiket sütunu).
 **MIKRO** `{id, n, cond, part, xray?, d, etken[[ad, tür, ipucu]], pat[4], lb{}, tani:'duke'|'jones'|null, tedavi[], korunma, links[]}`
 `pat` dört patogenez adımıdır; `KalpViz.micro(id, adım, lb)` aynı `id` ile sahneyi çizer.
 
-**YOLLAR** `{id, n, cond, vaka, a, f, p, d, m}` her katman `[[ref, ...], 'bu hastalık için o katmanda ne öğrenilir']`.
+**YOLLAR** `{id, n, cond, vaka, a, f, m, p, d}` her katman `[[ref, ...], 'bu hastalık için o katmanda ne öğrenilir']`.
 Doğrudan bir etkeni olmayan hastalıkta `m` için boş ref listesi ve kısa bir not yazılır.
 
 ## Yeni bir organ eklemek (sıra)
